@@ -29,7 +29,10 @@ jobs:
         fetch-depth: 2
 
     - name: Setup Android SDK tools
-      uses: android-actions/setup-android@v3
+      uses: android-actions/setup-android@v4
+      with:
+        # Google removed the legacy SDK 'tools' package; install only platform-tools.
+        packages: 'platform-tools'
     - name: Install pinned Android NDK
       run: sdkmanager --install 'ndk;27.2.12479018'
     - name: Build TrackerGuard Android native scanners

@@ -23,7 +23,10 @@ jobs:
       - name: R1 native binary manifest and CLI regression tests
         run: python3 tests/test_trackerguard_r1.py
       - name: Setup Android SDK tools
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
+        with:
+          # Google removed the legacy SDK 'tools' package; install only platform-tools.
+          packages: 'platform-tools'
       - name: Install pinned Android NDK
         run: sdkmanager --install 'ndk;27.2.12479018'
       - name: Compile Android scanner for supported ABIs
