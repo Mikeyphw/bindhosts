@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Curated exact-prefix subset of MuntashirAkon/AppManager app/src/main/res/values/trackers.xml
+# Licensed under GPL-3.0-or-later by upstream; see docs/TRACKERGUARD_R1.md.
+# prefix|identifier|review-severity
+com.google.android.gms.measurement.|google-measurement|review
+com.google.firebase.analytics.|firebase-analytics|review
+com.google.firebase.crashlytics.|firebase-crashlytics|caution
+com.facebook.appevents.|facebook-appevents|review
+com.facebook.ads.|facebook-ads|review
+com.appsflyer.|appsflyer|review
+com.adjust.sdk.|adjust|review
+com.flurry.|flurry|review
+com.mixpanel.|mixpanel|review
+com.amplitude.|amplitude|review
+com.bugsnag.|bugsnag|caution
+com.microsoft.appcenter.analytics.|appcenter-analytics|review
+com.microsoft.appcenter.crashes.|appcenter-crashes|caution
+com.amazon.insights.|amazon-insights|review
+com.mapbox.android.telemetry.|mapbox-telemetry|caution

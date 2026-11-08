@@ -20,6 +20,9 @@ bindhosts tracker — optional app-component firewall
 Usage:
   bindhosts tracker status
   bindhosts tracker list
+  bindhosts tracker scan PKG
+  bindhosts tracker preview PKG
+  bindhosts tracker block PKG
   bindhosts tracker add PKG service|receiver|activity CLASS
   bindhosts tracker remove PKG service|receiver|activity CLASS
   bindhosts tracker restore PKG
@@ -119,7 +122,7 @@ status() {
     if grep -Fq "$TG_MARKER" "$TG_FILE"; then say 'IFW ownership: TrackerGuard'; else say 'IFW ownership: FOREIGN (not modified)'; fi
   else say 'IFW ownership: no file'; fi
   if [ -f "$TG_RULES" ]; then say "Explicit blocks: $(grep -c '|' "$TG_RULES" || true)"; else say 'Explicit blocks: 0'; fi
-  say 'Automatic detection: not available in R0'
+  say 'R1 inventory: available (base APK only); automatic install watcher: not enabled'
 }
 list_rules() {
   [ -f "$TG_RULES" ] || { say 'No blocks'; return 0; }
@@ -184,12 +187,18 @@ apply_rules() {
   say 'Reapplied TrackerGuard-owned IFW rules'
 }
 
+TG_R1_MODDIR=${TG_R1_MODDIR:-/data/adb/modules/bindhosts}
+. "$TG_R1_MODDIR/trackerguard_r1.sh"
+
 check_root
 _cmd=${1:-help}; [ "$#" -eq 0 ] || shift
 case "$_cmd" in
   help|-h|--help) usage ;;
   status) status ;;
   list) list_rules ;;
+  scan) tg_r1_scan "$@" ;;
+  preview) tg_r1_preview "$@" ;;
+  block) tg_r1_block "$@" ;;
   add) add_rule "$@" ;;
   remove) remove_rule "$@" ;;
   restore) restore_pkg "$@" ;;
