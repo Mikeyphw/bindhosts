@@ -1,7 +1,7 @@
 id=bindhosts
-name=bindhosts
-version=v2.1.5
-versionCode=215
-author=xx, KOWX712
-updateJson=https://raw.githubusercontent.com/bindhosts/bindhosts/master/update.json
-description=Systemless hosts for APatch, KernelSU and Magisk 
+name=bindhosts + TrackerGuard
+version=v2.1.5-tg.0.2
+versionCode=21602
+author=xx, KOWX712; TrackerGuard contributors
+updateJson=https://raw.githubusercontent.com/Mikeyphw/bindhosts/master/update.json
+description=Systemless hosts + optional IFW tracker blocking for APatch, KernelSU and Magisk

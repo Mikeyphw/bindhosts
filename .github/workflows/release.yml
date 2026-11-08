@@ -1,21 +1,23 @@
 name: Release
 
+# R1: NO automatic release until rooted Android IFW runtime qualification.
 on:
-  push:
-    branches:
-      - master
-    paths:
-      - '.github/workflows/release.yml'
-      - 'module/**'
-      - 'webui/**'
-      - 'update.json'
   workflow_dispatch:
+    inputs:
+      qualified:
+        description: 'Android 16 root/IFW runtime verified; publish release'
+        required: true
+        type: boolean
+        default: false
+permissions:
+  contents: write
 
 env:
   MODULE_NAME: 'bindhosts'
 
 jobs:
   release:
+    if: ${{ inputs.qualified == true }}
     runs-on: ubuntu-latest
     outputs:
       version_changed: ${{ env.version_changed }}
@@ -25,6 +27,30 @@ jobs:
       uses: actions/checkout@v7
       with:
         fetch-depth: 2
+
+    - name: Setup Android SDK tools
+      uses: android-actions/setup-android@v4
+      with:
+        # Google removed the legacy SDK 'tools' package; install only platform-tools.
+        packages: 'platform-tools'
+    - name: Install pinned Android NDK
+      run: sdkmanager --install 'ndk;27.2.12479018'
+    - name: Build TrackerGuard Android native scanners
+      shell: bash
+      run: |
+        set -euo pipefail
+        NDK="$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin"
+        for entry in 'arm64-v8a:aarch64-linux-android26-clang' 'armeabi-v7a:armv7a-linux-androideabi26-clang' 'x86_64:x86_64-linux-android26-clang'; do
+          abi="${entry%%:*}"; compiler="${entry#*:}"
+          mkdir -p "module/bin/$abi"
+          "$NDK/$compiler" -std=c11 -O2 -fPIE -pie -D_FORTIFY_SOURCE=2 -Wall -Wextra -Werror native/axmlscan.c -o "module/bin/$abi/axmlscan"
+          chmod 0755 "module/bin/$abi/axmlscan"
+          test -s "module/bin/$abi/axmlscan"
+        done
+    - name: R0 and R1 regression acceptance
+      run: |
+        TG_R1_MODDIR="$PWD/module" sh tests/test_trackerguard.sh
+        python3 tests/test_trackerguard_r1.py
 
     - name: Setup pnpm
       uses: pnpm/action-setup@v6
@@ -53,7 +79,7 @@ jobs:
         COMMIT_ID=$(git rev-parse --short HEAD)
         echo "ZIP_NAME=${{ env.MODULE_NAME }}_${CURRENT_VERSION_CODE}-${COMMIT_ID}" >> $GITHUB_ENV
         echo "VERSION=$(jq -r .version update.json)" >> $GITHUB_ENV
-        CHANGELOG_RAW=$(git diff HEAD^ HEAD -- "CHANGELOG.md" | grep '^+[^+]' | sed 's/^+//')
+        CHANGELOG_RAW=$(git diff HEAD^ HEAD -- "CHANGELOG.md" | grep '^+[^+]' | sed 's/^+//' || true)
         {
           echo "CHANGELOG<<EOF"
           echo -e "## ${{ env.MODULE_NAME }}\n${MODULE_DESC}\n\n---\n\n# Changelog:\n${CHANGELOG_RAW}"

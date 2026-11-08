@@ -1,4 +1,9 @@
 #!/bin/sh
+# Only remove our own IFW rules; never touch App Manager's rules.
+tg_ifw=/data/system/ifw/bindhosts_trackerguard.xml
+if [ -f "$tg_ifw" ] && [ ! -L "$tg_ifw" ] && grep -Fq '<!-- bindhosts-tracker: managed IFW file -->' "$tg_ifw"; then
+    rm -f "$tg_ifw"
+fi
 # delete settings
 rm -rf /data/adb/bindhosts
 # delete symlink, ap/ksu

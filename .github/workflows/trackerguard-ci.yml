@@ -1,0 +1,77 @@
+name: TrackerGuard R1 native scanner, IFW tests and module ZIP
+on:
+  push:
+    branches: ['feature/trackerguard-*']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test-and-package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Shell syntax
+        run: |
+          sh -n module/trackerguard.sh
+          sh -n module/trackerguard_r1.sh
+          sh -n module/bindhosts.sh
+          sh -n module/service.sh
+          sh -n module/uninstall.sh
+      - name: R0 IFW behavior and rollback tests
+        run: TG_R1_MODDIR="$PWD/module" sh tests/test_trackerguard.sh
+      - name: R1 native binary manifest and CLI regression tests
+        run: python3 tests/test_trackerguard_r1.py
+      - name: Setup Android SDK tools
+        uses: android-actions/setup-android@v4
+        with:
+          # Google removed the legacy SDK 'tools' package; install only platform-tools.
+          packages: 'platform-tools'
+      - name: Install pinned Android NDK
+        run: sdkmanager --install 'ndk;27.2.12479018'
+      - name: Compile Android scanner for supported ABIs
+        shell: bash
+        run: |
+          set -euo pipefail
+          NDK="$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          for entry in 'arm64-v8a:aarch64-linux-android26-clang' 'armeabi-v7a:armv7a-linux-androideabi26-clang' 'x86_64:x86_64-linux-android26-clang'; do
+            abi="${entry%%:*}"
+            compiler="${entry#*:}"
+            mkdir -p "module/bin/$abi"
+            "$NDK/$compiler" -std=c11 -O2 -fPIE -pie -D_FORTIFY_SOURCE=2 \
+              -Wall -Wextra -Werror native/axmlscan.c -o "module/bin/$abi/axmlscan"
+            test -s "module/bin/$abi/axmlscan"
+            chmod 0755 "module/bin/$abi/axmlscan"
+            file "module/bin/$abi/axmlscan"
+          done
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.22.0
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: pnpm
+          cache-dependency-path: webui/pnpm-lock.yaml
+      - name: Build existing bindhosts WebUI
+        run: |
+          cd webui
+          pnpm install --frozen-lockfile
+          pnpm build
+          test -f ../module/webroot/index.html
+      - name: Validate module payload
+        run: |
+          test -s module/data/tracker-signatures.tsv
+          for abi in arm64-v8a armeabi-v7a x86_64; do test -x "module/bin/$abi/axmlscan"; done
+          test -f module/webroot/index.html
+          test -f module/META-INF/com/google/android/update-binary
+      - name: Package installable module
+        run: |
+          cd module
+          zip -qr "$RUNNER_TEMP/bindhosts-trackerguard-r1.zip" .
+      - name: Upload installable module ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: bindhosts-trackerguard-r1
+          path: ${{ runner.temp }}/bindhosts-trackerguard-r1.zip
