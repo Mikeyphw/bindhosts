@@ -192,4 +192,9 @@ if [ ! "$APATCH" = true ] && [ ! "$KSU" = true ]; then
 	sh "$MODDIR/boot-completed.sh" &
 fi
 
+# Restore this fork's explicit IFW rules after a reboot (no tracker discovery).
+if [ -s "$PERSISTENT_DIR/trackerguard/rules.tsv" ] && [ -f "$MODDIR/trackerguard.sh" ]; then
+    sh "$MODDIR/trackerguard.sh" apply >> "$PERSISTENT_DIR/trackerguard/boot.log" 2>&1 &
+fi
+
 # EOF

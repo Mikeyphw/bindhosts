@@ -2,6 +2,11 @@
 PATH=/data/adb/ap/bin:/data/adb/ksu/bin:/data/adb/magisk:/data/data/com.termux/files/usr/bin:$PATH
 MODDIR="/data/adb/modules/bindhosts"
 PERSISTENT_DIR="/data/adb/bindhosts"
+# Optional TrackerGuard IFW engine; all standard bindhosts options unchanged.
+if [ "${1:-}" = tracker ]; then
+    shift
+    exec sh "$MODDIR/trackerguard.sh" "$@"
+fi
 . $MODDIR/utils.sh
 . $MODDIR/mode.sh
 
@@ -692,7 +697,7 @@ case "$1" in
 	--toggle-updatejson) toggle_updatejson; exit ;;
 	--hosts-lastmod) hosts_lastmod; exit ;;
 	--whitelist) instant_whitelist "$@"; exit ;;
-	--install-canary) install_latest_artifact; exit;;
+	--install-canary) echo "[!] Upstream canary installer disabled in TrackerGuard fork; use fork releases"; exit 1;;
 	--update-locales) update_locales; exit;;
 	--setup-link) setup_link; exit;;
 	--help|*) show_help; exit ;;

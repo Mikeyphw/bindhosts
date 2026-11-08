@@ -1,0 +1,46 @@
+name: TrackerGuard R0 tests and KSU module zip
+on:
+  push:
+    branches: ['feature/trackerguard-*']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test-and-package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Shell syntax
+        run: |
+          sh -n module/trackerguard.sh
+          sh -n module/bindhosts.sh
+          sh -n module/service.sh
+          sh -n module/uninstall.sh
+      - name: IFW behavior and rollback tests
+        run: sh tests/test_trackerguard.sh
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.22.0
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: pnpm
+          cache-dependency-path: webui/pnpm-lock.yaml
+      - name: Build original bindhosts WebUI
+        run: |
+          cd webui
+          pnpm install --frozen-lockfile
+          pnpm build
+          test -f ../module/webroot/index.html
+      - name: Package installable module
+        run: |
+          cd module
+          zip -qr "$RUNNER_TEMP/bindhosts-trackerguard-r0.zip" .
+      - name: Upload installable module ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: bindhosts-trackerguard-r0
+          path: ${{ runner.temp }}/bindhosts-trackerguard-r0.zip
