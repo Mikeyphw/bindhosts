@@ -62,8 +62,8 @@ class UX05Contract(unittest.TestCase):
                      '.github/workflows/release.yml'):
             self.assertIn('test_ux05_diagnostics.py',read(path))
             self.assertIn('test_ux05_contract.py',read(path))
-        self.assertIn('versionCode=21608',read('module/module.prop'))
-        self.assertIn('v2.1.5-tg.0.8',read('update.json'))
+        self.assertIn('versionCode=21609',read('module/module.prop'))
+        self.assertIn('v2.1.5-tg.0.9',read('update.json'))
         self.assertNotIn('monitor enable',read('module/ux05_diagnostics.sh'))
 
 if __name__=='__main__':unittest.main(verbosity=2)

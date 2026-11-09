@@ -183,6 +183,12 @@ busybox sed -i "s/^description=.*/$string/g" "$MODDIR/module.prop.tmp"
 busybox mv -f "$MODDIR/module.prop.tmp" "$MODDIR/module.prop"
 } # apply_description
 
+# UX06: restore any interrupted configuration bundle before other services start.
+# This persistent recovery journal is intentionally NOT under TMPDIR.
+if [ -e "$PERSISTENT_DIR/.ux06-restore-pending" ] && [ -f "$MODDIR/config_backup_safe.sh" ]; then
+    sh "$MODDIR/config_backup_safe.sh" recover >> "$PERSISTENT_DIR/backup-recovery.log" 2>&1 ||
+      echo 'bindhosts: configuration recovery requires inspection' >> /dev/kmsg
+fi
 # UX03 recover a journal before other services inspect the active hosts file.
 if [ -e "$PERSISTENT_DIR/.hosts-target-journal" ]; then
     BH_HOSTS_ROOT="$PERSISTENT_DIR" sh "$MODDIR/hosts_target_safe.sh" recover "$target_hostsfile"       >> "$PERSISTENT_DIR/hosts-recovery.log" 2>&1 || echo 'bindhosts: journal recovery failed' >> /dev/kmsg

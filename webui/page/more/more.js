@@ -1,10 +1,10 @@
 import { bindAppearanceControls } from '../../utils/appearance.js';
+import { mountBackupControls, refreshBackupControls } from '../../utils/backup_safe.js';
 import { router } from '../../route.js';
 import { escapeHtml } from '../../utils/safe_text.js';
 import { exec, spawn } from 'kernelsu-alt';
-import { showPrompt, reboot, basePath, moduleDirectory, linkRedirect, filePaths, fetchText, updateUIVisibility } from '../../utils/util.js';
+import { showPrompt, reboot, basePath, moduleDirectory, linkRedirect, fetchText, updateUIVisibility } from '../../utils/util.js';
 import { getString } from '../../utils/language.js';
-import { FileSelector } from '../../utils/file_selector.js';
 import { addCopyToClipboardListeners, setupDocsMenu } from '../../utils/docs.js';
 import { formatCapturedLogs, capturedLogs } from '../../utils/log_catcher.js';
 let isDownloading = false;
@@ -414,84 +414,8 @@ function openTcpdumpTerminal() {
     }, 50);
 }
 
-/**
- * Backup bindhosts config to /sdcard/Download/bindhosts_config.json
- * @returns {Promise<void>}
- * @see controlPanelEventlistener - Calling this function
- */
-async function exportConfig() {
-    const config = {
-        metadata: {
-            version: "v1",
-            description: "bindhosts config backup"
-        }
-    };
-
-    // Fetch and process each file
-    for (const [fileType, filePath] of Object.entries(filePaths)) {
-        const text = await fetchText(`link/PERSISTENT_DIR/${filePath}`, `${basePath}/${filePath}`).catch(() => "");
-        const lines = text.trim();
-        config[fileType] = {
-            path: filePath,
-            content: lines
-        };
-    }
-
-    // Output in json format
-    const result = await exec(`
-FILENAME="/storage/emulated/0/Download/bindhosts_config_$(date +%Y%m%d_%H%M%S).json"
-cat <<'JSON_EOF' > "$FILENAME"
-${JSON.stringify(config)}
-JSON_EOF
-echo "$FILENAME"
-        `);
-    if (result.errno === 0) {
-        showPrompt(getString('backup_restore_exported', result.stdout.trim()));
-    } else {
-        console.error("Backup failed:", result.stderr);
-        showPrompt(getString('backup_restore_export_fail'), false);
-    }
-}
-
-/**
- * Restore config
- * Open file selector and restore config from selected file
- * @return {Promise<void>}
- * @see controlPanelEventlistener - Calling this function
- */
-async function restoreConfig() {
-    const fileContent = await FileSelector.getFileContent("json");
-    if (!fileContent) return;
-    
-    const config = JSON.parse(fileContent);
-
-    // Validate using metadata
-    const isValid = config.metadata && config.metadata.description === "bindhosts config backup";
-    if (!isValid) {
-        showPrompt(getString('backup_restore_invalid_config'), false);
-        return;
-    }
-
-    // Restore each file according to backup version
-    if (config.metadata.version === "v1") {
-        for (const [fileType, fileData] of Object.entries(config)) {
-            if (!filePaths[fileType] || !fileData.content) continue;
-            const content = fileData.content;
-            const result = await exec(`
-cat <<'RESTORE_EOF' > ${basePath}/${fileData.path}
-${content}
-RESTORE_EOF
-chmod 644 ${basePath}/${fileData.path} || true
-            `);
-            if (result.errno === 0) {
-                showPrompt(getString('backup_restore_restored'));
-            } else {
-                console.error("Restore failed:", result.stderr);
-                showPrompt(getString('backup_restore_restore_fail'), false);
-            }
-        }
-    }
-}
+// UX06: legacy backup/restore was removed because raw config content was
+// interpolated into shell heredocs. Only the fixed backend now handles backups.
 
 /**
  * Open the log viewer terminal.
@@ -573,8 +497,6 @@ function controlPanelEventlistener(event) {
         "github-issues": () => linkRedirect('https://github.com/bindhosts/bindhosts/issues/new'),
         "canary-update": canaryUpdate,
         "locales-update": localesUpdate,
-        "export": exportConfig,
-        "restore": restoreConfig,
         "view-webui-log": openLogViewer,
         "ux05-activity-open": () => router.navigate('activity')
     };
@@ -588,14 +510,16 @@ function controlPanelEventlistener(event) {
 }
 
 // Lifecycle: Initial mount to DOM
-export function mount() {
+export function mount(section) {
     controlPanelEventlistener();
+    mountBackupControls(section);
     bindAppearanceControls(document);
     setupDocsMenu();
 }
 
 // Lifecycle: Each time page becomes visible
 export function onShow() {
+    refreshBackupControls();
     updateUIVisibility();
     checkUpdateStatus();
     checkBindhostsApp();

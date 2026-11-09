@@ -10,6 +10,7 @@
 @import "./page/activity/activity.css";
 @import "./page/hosts/hosts.css";
 @import "./page/more/more.css";
+@import "./utils/backup_safe.css";
 
 @layer base {
     body {
