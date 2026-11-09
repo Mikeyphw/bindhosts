@@ -15,6 +15,9 @@ on:
       - 'tests/test_responder_install_permissions.py'
       - 'tests/hosts-mount-acceptance.sh'
       - 'tests/test_webui_ux0304.py'
+      - 'module/ux05_diagnostics.sh'
+      - 'tests/test_ux05_diagnostics.py'
+      - 'tests/test_ux05_contract.py'
       - 'tests/test_webui_ux02.py'
       - 'module/hosts_config_safe.sh'
       - 'module/hosts_update_safe.sh'
@@ -58,6 +61,11 @@ jobs:
           python3 tests/test_blocked_response_ux04.py
           python3 tests/test_responder_install_permissions.py
           python3 tests/test_webui_ux0304.py
+      - name: UX05 receipts and redacted export
+        run: |
+          sh -n module/ux05_diagnostics.sh
+          python3 tests/test_ux05_diagnostics.py
+          python3 tests/test_ux05_contract.py
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
@@ -77,6 +85,8 @@ jobs:
           node --check webui/utils/hosts_secure_io.js
           node --check webui/utils/blocked_response.js
           node --check webui/page/hosts/hosts.js
+          node --check webui/page/activity/activity.js
+          node --check webui/page/more/more.js
       - name: Build WebUI
         run: |
           cd webui
@@ -85,6 +95,7 @@ jobs:
           test -s ../module/webroot/index.html
       - name: Verify module payload
         run: |
+          test -s module/ux05_diagnostics.sh
           test -s module/hosts_target_safe.sh
           test -s module/response_mode.sh
           test -s module/hosts_reset_safe.sh

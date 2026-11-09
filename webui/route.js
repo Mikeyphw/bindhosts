@@ -7,12 +7,14 @@ import hostsHtml from './page/hosts/hosts.html?raw';
 import moreHtml from './page/more/more.html?raw';
 import catalogHtml from './page/catalog/catalog.html?raw';
 import appsHtml from './page/apps/apps.html?raw';
+import activityHtml from './page/activity/activity.html?raw';
 
 import * as homeModule from './page/home/home.js';
 import * as hostsModule from './page/hosts/hosts.js';
 import * as moreModule from './page/more/more.js';
 import * as catalogModule from './page/catalog/catalog.js';
 import * as appsModule from './page/apps/apps.js';
+import * as activityModule from './page/activity/activity.js';
 
 class Router {
     constructor() {
@@ -26,7 +28,8 @@ class Router {
             catalog: { html: catalogHtml, module: catalogModule },
             apps: { html: appsHtml, module: appsModule },
             hosts: { html: hostsHtml, module: hostsModule },
-            more: { html: moreHtml, module: moreModule }
+            more: { html: moreHtml, module: moreModule },
+            activity: { html: activityHtml, module: activityModule }
         };
     }
 
@@ -116,7 +119,7 @@ class Router {
 
     updateFooter(name) {
         document.querySelectorAll('.bottom-bar-item').forEach(item => {
-            const isTarget = item.getAttribute('page') === name;
+            const isTarget = item.getAttribute('page') === (name === 'activity' ? 'more' : name);
             
             if (isTarget) {
                 item.setAttribute('selected', '');

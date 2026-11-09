@@ -38,6 +38,11 @@ jobs:
           python3 tests/test_hosts_target_ux03.py
           python3 tests/test_blocked_response_ux04.py
           python3 tests/test_webui_ux0304.py
+      - name: UX05 bounded activity and export regression tests
+        run: |
+          sh -n module/ux05_diagnostics.sh
+          python3 tests/test_ux05_diagnostics.py
+          python3 tests/test_ux05_contract.py
       - name: Setup Android SDK tools
         uses: android-actions/setup-android@v4
         with:
@@ -81,6 +86,7 @@ jobs:
           test -f ../module/webroot/index.html
       - name: Validate module payload
         run: |
+          test -s module/ux05_diagnostics.sh
           test -s module/hosts_target_safe.sh
           test -s module/hosts_reset_safe.sh
           test -s module/response_mode.sh

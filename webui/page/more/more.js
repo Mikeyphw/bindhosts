@@ -1,4 +1,5 @@
 import { bindAppearanceControls } from '../../utils/appearance.js';
+import { router } from '../../route.js';
 import { escapeHtml } from '../../utils/safe_text.js';
 import { exec, spawn } from 'kernelsu-alt';
 import { showPrompt, reboot, basePath, moduleDirectory, linkRedirect, filePaths, fetchText, updateUIVisibility } from '../../utils/util.js';
@@ -574,7 +575,8 @@ function controlPanelEventlistener(event) {
         "locales-update": localesUpdate,
         "export": exportConfig,
         "restore": restoreConfig,
-        "view-webui-log": openLogViewer
+        "view-webui-log": openLogViewer,
+        "ux05-activity-open": () => router.navigate('activity')
     };
 
     Object.entries(controlPanel).forEach(([element, functionName]) => {

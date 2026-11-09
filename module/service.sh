@@ -214,7 +214,11 @@ fi
 if [ -f "$PERSISTENT_DIR/response.mode" ] && [ -f "$MODDIR/response_mode.sh" ]; then
     (
        until [ "$(getprop sys.boot_completed)" = 1 ]; do sleep 2; done
-       sh "$MODDIR/response_mode.sh" "$PERSISTENT_DIR" "$target_hostsfile" start
+       if ! sh "$MODDIR/response_mode.sh" "$PERSISTENT_DIR" "$target_hostsfile" start; then
+         if [ -f "$MODDIR/ux05_diagnostics.sh" ]; then
+           BH_DIAG_STATE="$PERSISTENT_DIR" sh "$MODDIR/ux05_diagnostics.sh" record response start fail RESPONSE_START_FAILED >/dev/null 2>&1 || :
+         fi
+       fi
     ) >> "$PERSISTENT_DIR/response.log" 2>&1 &
 fi
 
