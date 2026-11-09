@@ -122,7 +122,7 @@ status() {
     if grep -Fq "$TG_MARKER" "$TG_FILE"; then say 'IFW ownership: TrackerGuard'; else say 'IFW ownership: FOREIGN (not modified)'; fi
   else say 'IFW ownership: no file'; fi
   if [ -f "$TG_RULES" ]; then say "Explicit blocks: $(grep -c '|' "$TG_RULES" || true)"; else say 'Explicit blocks: 0'; fi
-  say 'R1 inventory: available (base APK only); automatic install watcher: not enabled'
+  say 'R1 inventory: available (base APK only); R2 monitor: opt-in'
 }
 list_rules() {
   [ -f "$TG_RULES" ] || { say 'No blocks'; return 0; }
@@ -189,19 +189,27 @@ apply_rules() {
 
 TG_R1_MODDIR=${TG_R1_MODDIR:-/data/adb/modules/bindhosts}
 . "$TG_R1_MODDIR/trackerguard_r1.sh"
+. "$TG_R1_MODDIR/trackerguard_r2.sh"
 
 check_root
 _cmd=${1:-help}; [ "$#" -eq 0 ] || shift
 case "$_cmd" in
-  help|-h|--help) usage ;;
+  help|-h|--help) usage; tg_r2_usage ;;
   status) status ;;
   list) list_rules ;;
   scan) tg_r1_scan "$@" ;;
   preview) tg_r1_preview "$@" ;;
-  block) tg_r1_block "$@" ;;
-  add) add_rule "$@" ;;
-  remove) remove_rule "$@" ;;
-  restore) restore_pkg "$@" ;;
+  block) tg_r2_manual_block "$@" ;;
+  add) tg_r2_manual_add "$@" ;;
+  remove) tg_r2_manual_remove "$@" ;;
+  restore) tg_r2_manual_restore "$@" ;;
   apply) apply_rules ;;
+  monitor) tg_r2_monitor "$@" ;;
+  enroll) tg_r2_enroll "$@" ;;
+  unenroll) tg_r2_unenroll "$@" ;;
+  exclude) tg_r2_exclude "$@" ;;
+  include) tg_r2_include "$@" ;;
+  reconcile) tg_r2_reconcile "$@" ;;
+  json) tg_r2_json "$@" ;;
   *) usage; die "unknown command: $_cmd" ;;
 esac
