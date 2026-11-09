@@ -183,6 +183,10 @@ busybox sed -i "s/^description=.*/$string/g" "$MODDIR/module.prop.tmp"
 busybox mv -f "$MODDIR/module.prop.tmp" "$MODDIR/module.prop"
 } # apply_description
 
+# UX03 recover a journal before other services inspect the active hosts file.
+if [ -e "$PERSISTENT_DIR/.hosts-target-journal" ]; then
+    BH_HOSTS_ROOT="$PERSISTENT_DIR" sh "$MODDIR/hosts_target_safe.sh" recover "$target_hostsfile"       >> "$PERSISTENT_DIR/hosts-recovery.log" 2>&1 || echo 'bindhosts: journal recovery failed' >> /dev/kmsg
+fi
 apply_description & #fork in background
 
 if [ ! "$APATCH" = true ] && [ ! "$KSU" = true ]; then
@@ -204,6 +208,14 @@ if [ -f "$PERSISTENT_DIR/trackerguard/monitor.enabled" ] && [ -f "$MODDIR/tracke
         until [ "$(getprop sys.boot_completed)" = "1" ]; do sleep 5; done
         sh "$MODDIR/trackerguard.sh" monitor watch
     ) >> "$PERSISTENT_DIR/trackerguard/monitor.log" 2>&1 &
+fi
+
+# UX04 opt-in server only; no flag means no loopback listener.
+if [ -f "$PERSISTENT_DIR/response.mode" ] && [ -f "$MODDIR/response_mode.sh" ]; then
+    (
+       until [ "$(getprop sys.boot_completed)" = 1 ]; do sleep 2; done
+       sh "$MODDIR/response_mode.sh" "$PERSISTENT_DIR" "$target_hostsfile" start
+    ) >> "$PERSISTENT_DIR/response.log" 2>&1 &
 fi
 
 # EOF

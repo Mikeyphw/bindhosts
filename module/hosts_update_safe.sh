@@ -105,8 +105,24 @@ awk '
 
 {
   printf '127.0.0.1 localhost\n::1 localhost\n'
+  printf '# bindhosts-custom-start\n'
   LC_ALL=C sort -u "$STAGE/custom"
-  cat "$STAGE/filtered"
+  printf '# bindhosts-custom-end\n'
+  printf '# bindhosts-block-start\n'
+  _response_mode=off
+  if [ -f "$ROOT/response.mode" ]; then
+    [ ! -L "$ROOT/response.mode" ] || fail 'unsafe response mode flag'
+    _response_mode=$(cat "$ROOT/response.mode")
+  fi
+  case "$_response_mode" in
+    off) cat "$STAGE/filtered" ;;
+    logo|transparent)
+      # Never redirect blocked domains to localhost if the responder is absent.
+      sh "$MODDIR/response_mode.sh" "$ROOT" "$TARGET" status | grep -Fxq 'server=running' || fail 'HTTP responder not running'
+      awk '$1=="0.0.0.0" && NF==2 { print "127.0.0.1",$2,"# bh-response"; next } { print }' "$STAGE/filtered" ;;
+    *) fail 'invalid saved response mode' ;;
+  esac
+  printf '# bindhosts-block-end\n'
   printf '# bindhosts v%s\n' "$VERSION"
 } > "$STAGE/candidate" || fail 'could not render candidate'
 [ -s "$STAGE/candidate" ] && grep -Fq "# bindhosts v$VERSION" "$STAGE/candidate" || fail 'candidate validation failed'
@@ -114,33 +130,8 @@ awk '
 if cmp -s "$TARGET" "$STAGE/candidate"; then
   echo 'BH_UPDATE_UNCHANGED: original already up to date'; exit 0
 fi
-# Save old bytes before committing. For bind-mounted /system/etc/hosts a same-dir rename
-# may fail with EBUSY; in that case perform a verified write with rollback on failure.
-cp -p "$TARGET" "$STAGE/previous" || fail 'could not back up active hosts'
-_mode=$(stat -c %a "$TARGET" 2>/dev/null || echo 644)
-_uid=$(stat -c %u "$TARGET" 2>/dev/null || echo 0)
-_gid=$(stat -c %g "$TARGET" 2>/dev/null || echo 0)
-case "$_mode" in ''|*[!0-7]*) _mode=644 ;; esac
-NEXT_TARGET="${TARGET}.ux02.$$"
-if cp "$STAGE/candidate" "$NEXT_TARGET" 2>/dev/null; then
-  chmod "$_mode" "$NEXT_TARGET" 2>/dev/null || :
-  chown "$_uid:$_gid" "$NEXT_TARGET" 2>/dev/null || :
-  if mv -f "$NEXT_TARGET" "$TARGET" 2>/dev/null; then
-    NEXT_TARGET=''
-    command -v restorecon >/dev/null 2>&1 && restorecon "$TARGET" >/dev/null 2>&1 || :
-    echo 'BH_UPDATE_ATOMIC_PASS: complete validated hosts committed'
-    exit 0
-  fi
-  rm -f "$NEXT_TARGET"; NEXT_TARGET=''
-fi
-# Fallback for system/bind mounts that disallow renaming the active hosts file.
-echo 'BH_UPDATE_FALLBACK: target disallows atomic rename; using verified write and rollback' >&2
-if cat "$STAGE/candidate" > "$TARGET" && cmp -s "$STAGE/candidate" "$TARGET"; then
-  echo 'BH_UPDATE_VERIFIED_PASS: complete hosts written to bound target'
-  exit 0
-fi
-if ! cat "$STAGE/previous" > "$TARGET" || ! cmp -s "$STAGE/previous" "$TARGET"; then
-  echo 'BH_UPDATE_RESTORE_FAILED: manual recovery required from saved sources' >&2
-  exit 2
-fi
-fail 'write failed; previous hosts bytes restored'
+# Journaled mount-aware commit; recovery runs on boot if power is lost during
+# an in-place bind-mounted write. The fallback is NOT power-loss atomic.
+BH_HOSTS_ROOT="$ROOT" BH_HOSTS_TEST_MODE="${BH_UPDATE_TEST_MODE:-0}" \
+  sh "$MODDIR/hosts_target_safe.sh" commit "$TARGET" "$STAGE/candidate" || fail 'journaled hosts commit failed'
+echo 'BH_UPDATE_SAFE_PASS: candidate committed and verified'

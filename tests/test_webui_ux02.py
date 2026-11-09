@@ -34,8 +34,8 @@ class UX02Contract(unittest.TestCase):
         self.assertIn('hosts_config_safe.sh',script)
         self.assertNotIn('--no-check-certificate',script)
         helper=(ROOT/'module/hosts_update_safe.sh').read_text()
-        self.assertIn('BH_UPDATE_ATOMIC_PASS',helper)
-        self.assertIn('BH_UPDATE_FALLBACK',helper)
+        self.assertIn('hosts_target_safe.sh',helper)
+        self.assertIn('BH_TARGET_BIND_FALLBACK',(ROOT/'module/hosts_target_safe.sh').read_text())
         self.assertNotIn('--no-check-certificate ',helper)
 
     def test_ux01_features_not_dropped(self):
@@ -43,8 +43,8 @@ class UX02Contract(unittest.TestCase):
         self.assertIn('catalogHtml',router)
         self.assertIn('appsHtml',router)
         version=(ROOT/'module/module.prop').read_text()
-        self.assertIn('version=v2.1.5-tg.0.6',version)
-        self.assertIn('versionCode=21606',version)
+        self.assertIn('version=v2.1.5-tg.0.7',version)
+        self.assertIn('versionCode=21607',version)
 
     def test_ci_runs_new_tests(self):
         workflow=(ROOT/'.github/workflows/bindhosts-ux-ci.yml').read_text()

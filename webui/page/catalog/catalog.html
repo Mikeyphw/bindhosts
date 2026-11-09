@@ -18,6 +18,18 @@
     <p>Only one Energized tier is managed at a time. Large combined lists overlap heavily, so adding every tier rarely improves protection.</p>
     <p class="ux-small">Source status reports your local configuration, not a verified network download. Preset links are independently maintained by their publishers.</p>
   </section>
+  <section class="ux-card" aria-labelledby="response-heading">
+    <h2 id="response-heading">Blocked-page image (HTTP only)</h2>
+    <p class="ux-small">An optional, loopback-only image response. HTTPS cannot show the image. Off by default; your existing blocklists are unchanged until you enable this.</p>
+    <label for="response-mode">Response style</label>
+    <select id="response-mode" class="ux-response-select">
+      <option value="off">Standard connection failure</option>
+      <option value="transparent">Transparent GIF</option>
+      <option value="logo">Bindhosts blocked image</option>
+    </select>
+    <button id="response-apply" type="button" class="ux-secondary-button">Apply response style</button>
+    <p id="response-status" class="ux-small" role="status" aria-live="polite">Reading HTTP response mode…</p>
+  </section>
   <md-dialog id="catalog-confirm-dialog">
     <div slot="headline" id="catalog-confirm-title">Confirm change</div>
     <div slot="content" id="catalog-confirm-body"></div>

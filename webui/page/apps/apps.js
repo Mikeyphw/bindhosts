@@ -9,6 +9,7 @@ let selected = '';
 let status = null;
 let working = false;
 let previewLoadedFor = '';
+let ownedRules = [];
 
 function node(tag, klass, text) {
     const e = document.createElement(tag);
@@ -90,6 +91,22 @@ function updateSelectedUi() {
     view.querySelector('#apps-unenroll-button').hidden = !enrolled;
     view.querySelector('#apps-exclude-button').hidden = excluded;
     view.querySelector('#apps-include-button').hidden = !excluded;
+    displayOwnedRules();
+}
+function displayOwnedRules() {
+    if (!view) return;
+    const target = view.querySelector('#apps-rule-list');
+    if (!target) return;
+    const relevant = selected ? ownedRules.filter(r => r.package === selected) : ownedRules;
+    target.replaceChildren();
+    target.append(node('p','ux-small',`${relevant.length} ${selected?'rules for selected app':'managed rules total'} · Manual rules are preserved when apps are unenrolled.`));
+    for (const rule of relevant.slice(0, 40)) {
+        const row = node('div','apps-component');
+        row.append(node('span','',`${rule.package} · ${rule.type}`),
+            node('small','',`${rule.source==='auto'?'Auto-managed':'Manual'} · ${rule.component}`));
+        target.append(row);
+    }
+    if (relevant.length > 40) target.append(node('p','ux-small',`Showing first 40 of ${relevant.length} rules.`));
 }
 function selectPackage(pkg) {
     if (!PACKAGE_RE.test(pkg) || !packages.includes(pkg)) return;
@@ -98,6 +115,7 @@ function selectPackage(pkg) {
     view.querySelector('#apps-preview').replaceChildren(node('p', 'ux-small', 'Preview this app before enrolling it.'));
     updateSelectedUi();
     displayPackages();
+    displayOwnedRules();
 }
 async function refreshStatus() {
     const raw = await run(`${ROOT_CMD} json status`);
@@ -105,8 +123,17 @@ async function refreshStatus() {
     if (parsed.schema !== 2 || !Array.isArray(parsed.enrolled) || !Array.isArray(parsed.excluded)) {
         throw new Error('TrackerGuard R2 JSON API unavailable');
     }
+    const rawRules = await run(`${ROOT_CMD} json rules`);
+    const rules = JSON.parse(rawRules);
+    if (!Array.isArray(rules) || rules.some(r => !r ||
+        !PACKAGE_RE.test(r.package) || !['receiver','service','activity'].includes(r.type) ||
+        !['auto','manual'].includes(r.source) || typeof r.component !== 'string')) {
+        throw new Error('TrackerGuard rule ownership API returned invalid data');
+    }
+    ownedRules = rules;
     status = parsed;
     updateStatusUi();
+    displayOwnedRules();
 }
 async function refreshInstalledApps() {
     const raw = await run('pm list packages -3');
@@ -185,8 +212,30 @@ async function switchMonitor() {
     finally { working = false; updateStatusUi(); }
 }
 
+async function checkOnce() {
+    if (working) return;
+    if (!await confirmAction('Check installed app changes?',
+        'Run one root-side R2 snapshot and reconcile only apps already enrolled. Existing manual rules are retained.')) return;
+    working=true;
+    try {
+        const result=await run(`${ROOT_CMD} monitor once`);
+        previewLoadedFor=''; // Installed package may have changed since the last preview.
+        await refreshStatus();
+        showPrompt(result.includes('R2_MONITOR_ONCE_PASS')?'App changes checked.':'Monitor completed; inspect logs.');
+    } catch(error){showPrompt(`Monitor failed: ${error.message}`,false,5000);}
+    finally {working=false;updateStatusUi();}
+}
+async function refreshNow() {
+    if(working)return;
+    working=true;
+    try {await Promise.all([refreshStatus(),refreshInstalledApps()]);showPrompt('TrackerGuard status refreshed.');}
+    catch(error){showPrompt(error.message,false,4500);}
+    finally {working=false;updateStatusUi();}
+}
 export function mount(section) {
     view = section;
+    view.querySelector('#apps-scan-once').onclick=checkOnce;
+    view.querySelector('#apps-refresh').onclick=refreshNow;
     view.querySelector('#apps-search').addEventListener('input', displayPackages);
     view.querySelector('#apps-preview-button').onclick = preview;
     view.querySelector('#apps-monitor-toggle').onclick = switchMonitor;

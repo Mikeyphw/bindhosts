@@ -18,15 +18,26 @@ jobs:
           sh -n module/trackerguard_r2.sh
           sh -n module/bindhosts.sh
           sh -n module/service.sh
+          bash -n module/customize.sh
+          sh -n module/hosts_target_safe.sh
+          sh -n module/response_mode.sh
+          sh -n module/hosts_reset_safe.sh
           sh -n module/uninstall.sh
       - name: R0 IFW behavior and rollback tests
         run: TG_R1_MODDIR="$PWD/module" sh tests/test_trackerguard.sh
       - name: R1 native binary manifest and CLI regression tests
         run: python3 tests/test_trackerguard_r1.py
       - name: KernelSU native scanner install permissions
-        run: python3 tests/test_scanner_install_permissions.py
+        run: |
+          python3 tests/test_scanner_install_permissions.py
+          python3 tests/test_responder_install_permissions.py
       - name: R2 opt-in observer and automatic IFW reconciliation tests
         run: python3 tests/test_trackerguard_r2.py
+      - name: UX03/UX04 regression tests
+        run: |
+          python3 tests/test_hosts_target_ux03.py
+          python3 tests/test_blocked_response_ux04.py
+          python3 tests/test_webui_ux0304.py
       - name: Setup Android SDK tools
         uses: android-actions/setup-android@v4
         with:
@@ -47,6 +58,9 @@ jobs:
               -Wall -Wextra -Werror native/axmlscan.c -o "module/bin/$abi/axmlscan"
             test -s "module/bin/$abi/axmlscan"
             chmod 0755 "module/bin/$abi/axmlscan"
+            "$NDK/$compiler" -std=c11 -O2 -fPIE -pie -D_FORTIFY_SOURCE=2 \
+              -Wall -Wextra -Werror native/blocked_response.c -o "module/bin/$abi/blocked_response"
+            chmod 0755 "module/bin/$abi/blocked_response"
             file "module/bin/$abi/axmlscan"
           done
       - name: Setup pnpm
@@ -67,6 +81,10 @@ jobs:
           test -f ../module/webroot/index.html
       - name: Validate module payload
         run: |
+          test -s module/hosts_target_safe.sh
+          test -s module/hosts_reset_safe.sh
+          test -s module/response_mode.sh
+          for abi in arm64-v8a armeabi-v7a x86_64; do test -x "module/bin/$abi/blocked_response"; done
           test -s module/data/tracker-signatures.tsv
           for abi in arm64-v8a armeabi-v7a x86_64; do test -x "module/bin/$abi/axmlscan"; done
           test -f module/webroot/index.html

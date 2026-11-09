@@ -69,6 +69,15 @@ for tg_abi in arm64-v8a armeabi-v7a x86_64; do
 done
 unset tg_abi tg_scanner
 # TG_SCANNER_PERMISSIONS_END
+# UX04_RESPONDER_PERMISSIONS_BEGIN
+for tg_abi in arm64-v8a armeabi-v7a x86_64; do
+    tg_response="$MODPATH/bin/$tg_abi/blocked_response"
+    [ -f "$tg_response" ] || abort "UX04: missing native responder for $tg_abi"
+    set_perm "$tg_response" 0 0 0755
+    [ -x "$tg_response" ] || abort "UX04: native responder not executable for $tg_abi"
+done
+unset tg_abi tg_response
+# UX04_RESPONDER_PERMISSIONS_END
 
 # symlink bindhosts to manager path
 # for ez termux usage
