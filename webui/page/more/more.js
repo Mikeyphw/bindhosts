@@ -1,3 +1,5 @@
+import { bindAppearanceControls } from '../../utils/appearance.js';
+import { escapeHtml } from '../../utils/safe_text.js';
 import { exec, spawn } from 'kernelsu-alt';
 import { showPrompt, reboot, basePath, moduleDirectory, linkRedirect, filePaths, fetchText, updateUIVisibility } from '../../utils/util.js';
 import { getString } from '../../utils/language.js';
@@ -545,7 +547,7 @@ function refreshLogTerminal() {
         const time = new Date(entry.timestamp).toLocaleTimeString();
         const p = document.createElement('p');
         p.className = 'action-terminal-output';
-        p.innerHTML = `<span class="log-time">[${time}]</span> <span class="log-level level-${entry.level.toLowerCase()}">[${entry.level}]</span> <span class="log-message">${entry.message}</span>${entry.detail ? ' <span class="log-detail">| ' + entry.detail + '</span>' : ''}`;
+        p.innerHTML = `<span class="log-time">[${time}]</span> <span class="log-level level-${entry.level.toLowerCase()}">[${entry.level}]</span> <span class="log-message">${escapeHtml(entry.message)}</span>${entry.detail ? ' <span class="log-detail">| ' + escapeHtml(entry.detail) + '</span>' : ''}`;
         terminalContent.appendChild(p);
     });
 
@@ -586,6 +588,7 @@ function controlPanelEventlistener(event) {
 // Lifecycle: Initial mount to DOM
 export function mount() {
     controlPanelEventlistener();
+    bindAppearanceControls(document);
     setupDocsMenu();
 }
 

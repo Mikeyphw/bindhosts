@@ -3,6 +3,7 @@ import { checkMMRL, setupSlideMenu, moduleDirectory } from './utils/util.js';
 import { loadTranslations } from './utils/language.js';
 import { closeTopManagedLayer, hasManagedHistoryLayer, registerManagedDialog } from './utils/history.js';
 import { router } from './route.js';
+import { applyAppearance } from './utils/appearance.js';
 import { exec } from 'kernelsu-alt';
 import { WXEventHandler } from "webuix";
 import '@material/web/checkbox/checkbox.js';
@@ -174,6 +175,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.querySelectorAll('[unresolved]').forEach(el => el.removeAttribute('unresolved'));
     checkMMRL();
     setupSlideMenu();
+    applyAppearance();
     router.navigate('home');
     setupUserCustomization();
     setupRickRoll();

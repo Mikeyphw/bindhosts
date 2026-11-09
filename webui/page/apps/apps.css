@@ -1,0 +1,22 @@
+.apps-content { display:flex; flex-direction:column; gap:12px; }
+.apps-content .ux-page-heading { margin-bottom:8px; }
+.apps-monitor { display:flex; align-items:center; justify-content:space-between; gap:14px; }
+.apps-monitor > div {flex:1;}
+.apps-monitor .ux-secondary-button {flex-shrink:0;}
+.apps-summary-card {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));text-align:center;gap:7px;}
+.apps-summary-card div {display:flex;flex-direction:column;gap:4px;}
+.apps-summary-card strong {font-size:1.32rem;color:var(--md-sys-color-primary);}
+.apps-summary-card small {font-size:.73rem;color:var(--md-sys-color-on-surface-variant);}
+.apps-selector label {display:block;margin-bottom:10px;font-size:.9rem;font-weight:600;}
+.apps-selector input {width:100%;padding:12px 14px;border-radius:14px;border:1px solid var(--md-sys-color-outline);background:var(--md-sys-color-surface);color:var(--md-sys-color-on-surface);font:inherit;box-sizing:border-box;}
+.apps-selector input:focus-visible {outline:2px solid var(--md-sys-color-primary);outline-offset:2px;}
+.apps-package-list {max-height:220px;overflow-y:auto;margin:12px 0 0;display:flex;flex-direction:column;gap:4px;}
+.apps-package-button {padding:10px 12px;text-align:start;border:0;border-radius:12px;background:var(--md-sys-color-surface-container-high);color:var(--md-sys-color-on-surface);font:inherit;font-size:.84rem;word-break:break-word;}
+.apps-package-button[aria-selected="true"] {background:var(--md-sys-color-primary-container);color:var(--md-sys-color-on-primary-container);}
+.apps-controls {display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;}
+.apps-controls [hidden], .apps-detail[hidden] {display:none !important;}
+.apps-preview {max-height:280px;overflow-y:auto;}
+.apps-component {display:flex;flex-direction:column;gap:3px;padding:10px 0;border-bottom:1px solid var(--md-sys-color-outline-variant);}
+.apps-component span {font-size:.83rem;word-break:break-word;}
+.apps-component small {font-size:.74rem;color:var(--md-sys-color-on-surface-variant);}
+@media (max-width:540px){.apps-monitor{flex-direction:column;align-items:stretch}.apps-controls button{flex:1 1 42%;}}

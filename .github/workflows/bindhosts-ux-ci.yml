@@ -1,0 +1,57 @@
+name: bindhosts WebUI UX and sources catalog
+on:
+  push:
+    branches: ['feature/bindhosts-ux*']
+  pull_request:
+    paths:
+      - 'webui/**'
+      - 'module/source_catalog.sh'
+      - 'module/data/source-catalog.tsv'
+      - 'tests/test_source_catalog.py'
+      - 'tests/test_webui_ux01.py'
+      - '.github/workflows/bindhosts-ux-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  ux-tests-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate safe catalog backend
+        run: |
+          sh -n module/source_catalog.sh
+          python3 -m unittest discover -s tests -p 'test_source_catalog.py' -v
+          python3 -m unittest discover -s tests -p 'test_webui_ux01.py' -v
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.22.0
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: pnpm
+          cache-dependency-path: webui/pnpm-lock.yaml
+      - name: Static JS syntax checks
+        run: |
+          node --check webui/page/catalog/catalog.js
+          node --check webui/page/apps/apps.js
+          node --check webui/utils/appearance.js
+          node --check webui/utils/safe_text.js
+      - name: Build WebUI
+        run: |
+          cd webui
+          pnpm install --frozen-lockfile
+          pnpm build
+          test -s ../module/webroot/index.html
+      - name: Verify module payload
+        run: |
+          test -s module/source_catalog.sh
+          test -s module/data/source-catalog.tsv
+          test -s module/webroot/index.html
+      - name: Upload built WebUI for inspection
+        uses: actions/upload-artifact@v4
+        with:
+          name: bindhosts-ux01-webroot
+          path: module/webroot/

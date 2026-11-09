@@ -1,0 +1,43 @@
+<div class="ux-content apps-content">
+  <header class="ux-page-heading">
+    <p class="ux-eyebrow">APP COMPONENT FIREWALL</p>
+    <h1>TrackerGuard</h1>
+    <p>Inspect installed apps, review detected trackers, and opt in to receiver protection.</p>
+  </header>
+  <section class="ux-card apps-monitor">
+    <div>
+      <h2>Automatic monitoring</h2>
+      <p id="apps-monitor-info" class="ux-small" role="status">Reading monitor state…</p>
+    </div>
+    <button id="apps-monitor-toggle" class="ux-secondary-button" type="button" disabled>Loading</button>
+  </section>
+  <section class="ux-card apps-summary-card" aria-label="Protection summary">
+    <div><strong id="apps-auto-count">—</strong><small>Auto rules</small></div>
+    <div><strong id="apps-enrolled-count">—</strong><small>Enrolled apps</small></div>
+    <div><strong id="apps-total-count">—</strong><small>Total rules</small></div>
+  </section>
+  <section class="ux-card apps-selector">
+    <label for="apps-search">Find installed apps</label>
+    <input id="apps-search" type="search" placeholder="Filter by package name" autocapitalize="none" autocomplete="off" spellcheck="false"/>
+    <div id="apps-packages" class="apps-package-list" role="listbox" aria-label="Installed applications"></div>
+    <p id="apps-load-notice" class="ux-small"></p>
+  </section>
+  <section id="apps-detail" class="ux-card apps-detail" hidden>
+    <h2 id="apps-selected-label">Selected package</h2>
+    <p id="apps-current-status" class="ux-small">Read-only until you choose an action</p>
+    <div id="apps-preview" class="apps-preview" aria-live="polite"></div>
+    <div class="apps-controls">
+      <button id="apps-preview-button" class="ux-secondary-button" type="button">Preview trackers</button>
+      <button id="apps-enroll-button" class="ux-primary-button" type="button">Enroll</button>
+      <button id="apps-unenroll-button" class="ux-secondary-button" type="button">Unenroll</button>
+      <button id="apps-exclude-button" class="ux-secondary-button" type="button">Exclude</button>
+      <button id="apps-include-button" class="ux-secondary-button" type="button">Remove exclusion</button>
+    </div>
+  </section>
+  <p class="ux-note">Automatic R2 protection applies only to reviewed, enabled broadcast receivers. Providers, services and activities require separate validation. Existing manual IFW rules are never removed by unenrollment.</p>
+  <md-dialog id="apps-confirm-dialog">
+    <div slot="headline" id="apps-confirm-title">Confirm TrackerGuard action</div>
+    <div slot="content" id="apps-confirm-body"></div>
+    <div slot="actions"><md-text-button id="apps-cancel">Cancel</md-text-button><md-text-button id="apps-confirm">Confirm</md-text-button></div>
+  </md-dialog>
+</div>

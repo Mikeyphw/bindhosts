@@ -1,0 +1,29 @@
+<div class="ux-content catalog-content">
+  <header class="ux-page-heading">
+    <p class="ux-eyebrow">HOSTS PROTECTION</p>
+    <h1>Source catalog</h1>
+    <p>Choose maintained hosts lists without copying URLs. Existing custom sources stay untouched.</p>
+  </header>
+  <section class="ux-card catalog-actions" aria-labelledby="catalog-help-title">
+    <div>
+      <h2 id="catalog-help-title">Your subscriptions</h2>
+      <p>Enable a preset to add it to your configuration. Changes take effect after you update hosts.</p>
+    </div>
+    <button class="ux-primary-button" type="button" id="catalog-update">Update hosts</button>
+  </section>
+  <div id="catalog-status" role="status" aria-live="polite" class="ux-note">Reading configured sources…</div>
+  <section aria-label="Curated source presets" id="catalog-list" class="catalog-grid"></section>
+  <section class="ux-card ux-muted-card">
+    <h2>About list combinations</h2>
+    <p>Only one Energized tier is managed at a time. Large combined lists overlap heavily, so adding every tier rarely improves protection.</p>
+    <p class="ux-small">Source status reports your local configuration, not a verified network download. Preset links are independently maintained by their publishers.</p>
+  </section>
+  <md-dialog id="catalog-confirm-dialog">
+    <div slot="headline" id="catalog-confirm-title">Confirm change</div>
+    <div slot="content" id="catalog-confirm-body"></div>
+    <div slot="actions">
+      <md-text-button id="catalog-cancel">Cancel</md-text-button>
+      <md-text-button id="catalog-confirm">Confirm</md-text-button>
+    </div>
+  </md-dialog>
+</div>
