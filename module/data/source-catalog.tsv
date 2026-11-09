@@ -1,0 +1,6 @@
+# id|name|hosts_url|group
+adaway|AdAway official|https://adaway.org/hosts.txt|core
+cubic|Cubic AdBlock|https://raw.githubusercontent.com/Vaz15k/Cubic-AdBlock/cubic/module/system/etc/hosts|comprehensive
+energized-spark|Energized Spark|https://energized.pro/spark/hosts.txt|energized
+energized-blu|Energized Blu|https://energized.pro/blu/hosts.txt|energized
+energized-ultimate|Energized Ultimate|https://energized.pro/ultimate/hosts.txt|energized

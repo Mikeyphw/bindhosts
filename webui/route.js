@@ -5,10 +5,14 @@ import { applyTranslations } from './utils/language.js';
 import homeHtml from './page/home/home.html?raw';
 import hostsHtml from './page/hosts/hosts.html?raw';
 import moreHtml from './page/more/more.html?raw';
+import catalogHtml from './page/catalog/catalog.html?raw';
+import appsHtml from './page/apps/apps.html?raw';
 
 import * as homeModule from './page/home/home.js';
 import * as hostsModule from './page/hosts/hosts.js';
 import * as moreModule from './page/more/more.js';
+import * as catalogModule from './page/catalog/catalog.js';
+import * as appsModule from './page/apps/apps.js';
 
 class Router {
     constructor() {
@@ -19,6 +23,8 @@ class Router {
         // Registry for easy access
         this.registry = {
             home: { html: homeHtml, module: homeModule },
+            catalog: { html: catalogHtml, module: catalogModule },
+            apps: { html: appsHtml, module: appsModule },
             hosts: { html: hostsHtml, module: hostsModule },
             more: { html: moreHtml, module: moreModule }
         };

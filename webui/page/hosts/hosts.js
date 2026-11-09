@@ -1,3 +1,4 @@
+import { escapeHtml } from '../../utils/safe_text.js';
 import { exec, spawn } from 'kernelsu-alt';
 import { showPrompt, basePath, moduleDirectory, filePaths, fetchText, updateUIVisibility } from '../../utils/util.js';
 import { getString } from '../../utils/language.js';
@@ -56,7 +57,7 @@ function displayHostsList(lines, fileType) {
         } catch {
             domain = domain.split(/[/:?#]/)[0];
         }
-        const faviconUrl = `https://twenty-icons.com/${domain}`;
+        const faviconUrl = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2224%22 height=%2224%22 viewBox=%220 0 24 24%22%3E%3Cpath fill=%22%23808080%22 d=%22M3 3h18v18H3zM5 5v14h14V5zM7 7h10v2H7zm0 4h10v2H7zm0 4h7v2H7z%22/%3E%3C/svg%3E';
 
         const listItem = document.createElement("div");
         listItem.className = 'scrollable-list';
@@ -67,7 +68,7 @@ function displayHostsList(lines, fileType) {
                     <div class="favicon-loader"></div>
                     <img class="favicon-img favicon" src="${faviconUrl}" />
                 </div>` : ""}
-                <div class="link-text">${name || url}</div>
+                <div class="link-text">${escapeHtml(name || url)}</div>
 
                 <!-- Checkbox (custom hosts and sources) -->
                 ${fileType === "custom" || fileType === "sources" ? `<md-checkbox></md-checkbox>` : ''}

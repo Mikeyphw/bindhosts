@@ -1,3 +1,4 @@
+import { escapeHtml } from '../../utils/safe_text.js';
 import { exec } from 'kernelsu-alt';
 import { showPrompt, reboot, basePath, moduleDirectory, setDeveloperOption, developerOption, fetchText, updateUIVisibility } from '../../utils/util.js';
 import { setupDocsMenu } from '../../utils/docs.js';
@@ -227,8 +228,8 @@ function loadMoreHosts(callback) {
         // Add remove button if dataType is not 'custom'
         hostItem.innerHTML = `
             <div class="host-list-row">
-                <div class="host-ip">${hostIp}</div>
-                <div class="host-domain">${domains.join(' ')}</div>
+                <div class="host-ip">${escapeHtml(hostIp)}</div>
+                <div class="host-domain">${escapeHtml(domains.join(' '))}</div>
             </div>
             ${dataType !== 'custom' ? `
             <md-filled-icon-button class="remove-btn">
@@ -325,6 +326,19 @@ function setupQueryInput() {
     };
 }
 
+async function updateTrackerSummary() {
+    const target = document.getElementById('tg-home-summary');
+    if (!target) return;
+    try {
+        const result = await exec(`sh ${moduleDirectory}/bindhosts.sh tracker json status`);
+        if (result.errno !== 0) throw new Error('TrackerGuard status unavailable');
+        const state = JSON.parse(result.stdout);
+        target.textContent = `${state.total_rules} IFW rules · ${state.enrolled.length} enrolled apps · Monitor ${state.monitor_enabled ? 'on' : 'off'}`;
+    } catch {
+        target.textContent = 'TrackerGuard status unavailable. Check your installed module version.';
+    }
+}
+
 // Lifecycle: Initial mount to DOM
 export function mount() {
     setupDevOtp();
@@ -338,6 +352,7 @@ export function onShow() {
     updateUIVisibility();
     document.getElementById('mode-btn').classList.add('show');
     updateStatus();
+    updateTrackerSummary();
     checkDevOption();
 }
 

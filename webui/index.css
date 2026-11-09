@@ -5,6 +5,8 @@
 @import "./utils/file_selector.css";
 
 @import "./page/home/home.css";
+@import "./page/catalog/catalog.css";
+@import "./page/apps/apps.css";
 @import "./page/hosts/hosts.css";
 @import "./page/more/more.css";
 

@@ -1,0 +1,7 @@
+[
+  {"id":"adaway","name":"AdAway","group":"core","level":"Balanced baseline","description":"Official maintained AdAway hosts list.","url":"https://adaway.org/hosts.txt"},
+  {"id":"cubic","name":"Cubic AdBlock","group":"comprehensive","level":"Comprehensive","description":"Combined hosts list from the Cubic AdBlock project. Large lists can affect app compatibility.","url":"https://raw.githubusercontent.com/Vaz15k/Cubic-AdBlock/cubic/module/system/etc/hosts"},
+  {"id":"energized-spark","name":"Energized Spark","group":"energized","level":"Lightweight","description":"The lighter Energized hosts pack. Choose only one Energized tier.","url":"https://energized.pro/spark/hosts.txt"},
+  {"id":"energized-blu","name":"Energized Blu","group":"energized","level":"Balanced","description":"The balanced Energized hosts pack. Choose only one Energized tier.","url":"https://energized.pro/blu/hosts.txt"},
+  {"id":"energized-ultimate","name":"Energized Ultimate","group":"energized","level":"Aggressive","description":"The largest Energized pack; may break site or app features.","url":"https://energized.pro/ultimate/hosts.txt"}
+]

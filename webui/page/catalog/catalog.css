@@ -1,0 +1,30 @@
+.ux-content { padding: 16px 16px calc(110px + var(--bottom-inset)); max-width: 1100px; margin: 0 auto; box-sizing: border-box; }
+.ux-page-heading { margin: 8px 4px 20px; }
+.ux-page-heading h1 { font-size: 1.5rem; margin: 3px 0 7px; font-weight: 650; }
+.ux-page-heading p { margin: 0; color: var(--md-sys-color-on-surface-variant); line-height: 1.4; }
+.ux-page-heading .ux-eyebrow { color: var(--md-sys-color-primary); font-size: .7rem; font-weight: 700; letter-spacing: .09em; }
+.ux-card { background: var(--md-sys-color-surface-container); color: var(--md-sys-color-on-surface); border: 1px solid var(--md-sys-color-outline-variant); border-radius: 20px; padding: 16px; box-sizing: border-box; }
+.ux-card h2 { margin: 0 0 7px; font-size: 1rem; font-weight: 650; }
+.ux-card p { margin: 4px 0 12px; line-height: 1.45; }
+.ux-small { color: var(--md-sys-color-on-surface-variant); font-size: .82rem; }
+.ux-note { padding: 8px 4px 12px; color: var(--md-sys-color-on-surface-variant); font-size: .83rem; }
+.catalog-actions { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.catalog-actions > div { flex: 1; }
+.catalog-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,290px),1fr)); gap: 12px; margin-bottom: 16px; }
+.catalog-card { display: flex; flex-direction: column; min-width: 0; }
+.catalog-card-top { display:flex; justify-content:space-between; align-items:start; gap:8px; }
+.catalog-description { color: var(--md-sys-color-on-surface-variant); font-size: .88rem; }
+.catalog-url { font-size: .74rem; overflow-wrap:anywhere; margin-top: auto; color:var(--md-sys-color-primary); }
+.catalog-card-footer { display:flex; justify-content:flex-end; padding-top: 16px; }
+.ux-primary-button, .ux-secondary-button { border:0; padding:11px 16px; min-height:42px; border-radius:100px; font:inherit; font-size:.85rem; font-weight:600; cursor:pointer; }
+.ux-primary-button { color:var(--md-sys-color-on-primary); background:var(--md-sys-color-primary); }
+.ux-secondary-button { color:var(--md-sys-color-on-secondary-container); background:var(--md-sys-color-secondary-container); }
+.ux-primary-button:disabled,.ux-secondary-button:disabled { opacity:.55; cursor:not-allowed; }
+.ux-primary-button:focus-visible,.ux-secondary-button:focus-visible { outline:2px solid var(--md-sys-color-primary); outline-offset:3px; }
+.ux-state { display:inline-flex; align-items:center; border-radius:100px; padding:5px 9px; font-size:.7rem; background:var(--md-sys-color-surface-container-high); color:var(--md-sys-color-on-surface-variant); white-space:nowrap; }
+.ux-state.ux-on { background:var(--md-sys-color-primary-container); color:var(--md-sys-color-on-primary-container); }
+.ux-muted-card { margin-top:12px; }
+@media(max-width:540px){ .catalog-actions{flex-direction:column;align-items:stretch} .catalog-actions button{width:100%;} }
+/* AMOLED background opt-in; accent hues still come from Material You. */
+body[data-black-background="true"] { --md-sys-color-background:#000; --md-sys-color-surface:#000; --md-sys-color-surface-container-lowest:#000; --md-sys-color-surface-container-low:#080808; --md-sys-color-surface-container:#101010; --md-sys-color-tonal-surface:#121212; }
+body[data-black-background="true"] .bottom-bar { background:#000; }
