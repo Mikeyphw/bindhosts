@@ -43,6 +43,11 @@ jobs:
           sh -n module/ux05_diagnostics.sh
           python3 tests/test_ux05_diagnostics.py
           python3 tests/test_ux05_contract.py
+      - name: UX06 private backup regression tests
+        run: |
+          sh -n module/config_backup_safe.sh
+          python3 tests/test_backup_safe_ux06.py
+          python3 tests/test_webui_ux06.py
       - name: Setup Android SDK tools
         uses: android-actions/setup-android@v4
         with:
@@ -86,6 +91,7 @@ jobs:
           test -f ../module/webroot/index.html
       - name: Validate module payload
         run: |
+          test -s module/config_backup_safe.sh
           test -s module/ux05_diagnostics.sh
           test -s module/hosts_target_safe.sh
           test -s module/hosts_reset_safe.sh

@@ -221,9 +221,24 @@ case "$cmd" in
     chmod 0644 "$TMP"
     mv -f "$TMP" "$_dst" || error 'cannot install import'
     TMP=''; echo 'BH_CONFIG_IMPORT_PASS' ;;
+  validate-snapshot)
+    # Read-only validation of one of UX06's fixed, private snapshot members.
+    [ "$#" -eq 2 ] || error 'validate-snapshot KIND SNAPSHOT_ID'
+    kind_path "$1"
+    _kind=$KIND; _id=$2
+    case "$_id" in bh-????????T??????-??????) : ;; *) error 'invalid snapshot identifier' ;; esac
+    case "$_id" in *[!A-Za-z0-9_-]*|*..*|*/*) error 'invalid snapshot characters' ;; esac
+    _backups="$ROOT/.ux06-backups"
+    _snap="$_backups/$_id"
+    [ -d "$_backups" ] && [ ! -L "$_backups" ] &&
+      [ -d "$_snap" ] && [ ! -L "$_snap" ] || error 'unsafe snapshot directory'
+    _target="$_snap/$_kind.txt"
+    [ -f "$_target" ] && [ ! -L "$_target" ] || error 'missing snapshot member'
+    validate_file "$_target"
+    echo 'BH_CONFIG_SNAPSHOT_VALID_PASS' ;;
   size)
     [ "$#" -eq 1 ] || error 'size FILE_KIND'; kind_path "$1"
     [ -f "$FILE" ] && [ ! -L "$FILE" ] || error 'missing file'
     wc -c < "$FILE" ;;
-  *) error 'usage: add|remove|toggle|replace|stage-begin|stage-chunk|stage-commit|stage-abort|rename-custom|delete-custom|import-custom|size' ;;
+  *) error 'usage: add|remove|toggle|replace|stage-begin|stage-chunk|stage-commit|stage-abort|rename-custom|delete-custom|import-custom|validate-snapshot|size' ;;
 esac

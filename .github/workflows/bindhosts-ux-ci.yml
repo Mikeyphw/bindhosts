@@ -18,6 +18,9 @@ on:
       - 'module/ux05_diagnostics.sh'
       - 'tests/test_ux05_diagnostics.py'
       - 'tests/test_ux05_contract.py'
+      - 'module/config_backup_safe.sh'
+      - 'tests/test_backup_safe_ux06.py'
+      - 'tests/test_webui_ux06.py'
       - 'tests/test_webui_ux02.py'
       - 'module/hosts_config_safe.sh'
       - 'module/hosts_update_safe.sh'
@@ -66,6 +69,11 @@ jobs:
           sh -n module/ux05_diagnostics.sh
           python3 tests/test_ux05_diagnostics.py
           python3 tests/test_ux05_contract.py
+      - name: UX06 private snapshots, import and recovery tests
+        run: |
+          sh -n module/config_backup_safe.sh
+          python3 tests/test_backup_safe_ux06.py
+          python3 tests/test_webui_ux06.py
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
@@ -85,6 +93,7 @@ jobs:
           node --check webui/utils/hosts_secure_io.js
           node --check webui/utils/blocked_response.js
           node --check webui/page/hosts/hosts.js
+          node --check webui/utils/backup_safe.js
           node --check webui/page/activity/activity.js
           node --check webui/page/more/more.js
       - name: Build WebUI
@@ -95,6 +104,7 @@ jobs:
           test -s ../module/webroot/index.html
       - name: Verify module payload
         run: |
+          test -s module/config_backup_safe.sh
           test -s module/ux05_diagnostics.sh
           test -s module/hosts_target_safe.sh
           test -s module/response_mode.sh

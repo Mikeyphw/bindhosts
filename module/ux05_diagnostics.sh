@@ -26,9 +26,9 @@ prepare() {
 }
 valid_record() {
   [ "$#" -eq 4 ] || err 'record AREA ACTION RESULT CODE'
-  case "$1" in hosts|recovery|tracker|response|system) : ;; *) err 'unknown receipt area' ;; esac
+  case "$1" in hosts|recovery|tracker|response|system|config) : ;; *) err 'unknown receipt area' ;; esac
   case "$2" in
-    update|reset|toggle|allowlist|commit|recover|monitor|enroll|unenroll|exclude|include|reconcile|block|add|remove|restore|apply|set|start|stop|install|boot|export|probe) : ;;
+    update|reset|toggle|allowlist|commit|recover|monitor|enroll|unenroll|exclude|include|reconcile|block|add|remove|restore|apply|set|start|stop|install|boot|export|probe|create|import) : ;;
     *) err 'unknown receipt operation' ;;
   esac
   case "$3" in ok|fail|warning|info) : ;; *) err 'unknown receipt outcome' ;; esac
@@ -36,7 +36,7 @@ valid_record() {
   [ "${#4}" -le 48 ] || err 'receipt code too long'
   # Fixed vocabulary: no arbitrary text can be smuggled into shared exports.
   case "$4" in
-    HOSTS_UPDATE_FAILED|HOSTS_UPDATE_OK|HOSTS_RESET_FAILED|HOSTS_RESET_OK|    HOSTS_TOGGLE_FAILED|HOSTS_TOGGLE_OK|HOSTS_ALLOWLIST_FAILED|HOSTS_ALLOWLIST_OK|    HOSTS_ATOMIC_COMMIT|HOSTS_INPLACE_COMMIT|RECOVERY_APPLIED|    RECOVERY_WRITE_FAILED|RECOVERY_ALREADY_DONE|RESPONSE_SET_OK|    RESPONSE_SET_FAILED|RESPONSE_START_FAILED|TG_ACTION_OK|TG_ACTION_FAILED) : ;;
+    HOSTS_UPDATE_FAILED|HOSTS_UPDATE_OK|HOSTS_RESET_FAILED|HOSTS_RESET_OK|    HOSTS_TOGGLE_FAILED|HOSTS_TOGGLE_OK|HOSTS_ALLOWLIST_FAILED|HOSTS_ALLOWLIST_OK|    HOSTS_ATOMIC_COMMIT|HOSTS_INPLACE_COMMIT|RECOVERY_APPLIED|    RECOVERY_WRITE_FAILED|RECOVERY_ALREADY_DONE|RESPONSE_SET_OK|    RESPONSE_SET_FAILED|RESPONSE_START_FAILED|TG_ACTION_OK|TG_ACTION_FAILED|CONFIG_BACKUP_OK) : ;;
     *) err 'unrecognized receipt code' ;;
   esac
 }
