@@ -78,6 +78,15 @@ for tg_abi in arm64-v8a armeabi-v7a x86_64; do
 done
 unset tg_abi tg_response
 # UX04_RESPONDER_PERMISSIONS_END
+# UX07_TLS_PERMISSIONS_BEGIN
+for tg_abi in arm64-v8a armeabi-v7a x86_64; do
+    tg_tls="$MODPATH/bin/$tg_abi/blocked_response_tls"
+    [ -s "$tg_tls" ] || abort "UX07: missing TLS responder for $tg_abi"
+    set_perm "$tg_tls" 0 0 0755
+    [ -x "$tg_tls" ] || abort "UX07: TLS responder not executable for $tg_abi"
+done
+unset tg_abi tg_tls
+# UX07_TLS_PERMISSIONS_END
 
 # symlink bindhosts to manager path
 # for ez termux usage

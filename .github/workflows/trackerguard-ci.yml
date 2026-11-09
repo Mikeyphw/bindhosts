@@ -78,6 +78,30 @@ jobs:
             chmod 0755 "module/bin/$abi/blocked_response"
             file "module/bin/$abi/axmlscan"
           done
+      - name: Setup Go for isolated HTTPS responder
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.x'
+          cache: false
+      - name: UX07 host TLS, blocked-domain restriction and opt-in rollback tests
+        run: |
+          sh -n module/https_response.sh
+          python3 tests/test_https_response_ux07.py
+          python3 tests/test_https_install_permissions.py
+          python3 tests/test_webui_ux07.py
+      - name: Build Android HTTPS responder for all supported ABIs
+        shell: bash
+        run: |
+          set -euo pipefail
+          NDK="$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          for entry in 'arm64-v8a:arm64:aarch64-linux-android26-clang' 'armeabi-v7a:arm:armv7a-linux-androideabi26-clang' 'x86_64:amd64:x86_64-linux-android26-clang'; do
+            IFS=: read -r abi arch compiler <<< "$entry"
+            mkdir -p "module/bin/$abi"
+            GOOS=android GOARCH="$arch" CGO_ENABLED=1 CC="$NDK/$compiler" \
+              go build -trimpath -ldflags='-s -w' -o "module/bin/$abi/blocked_response_tls" ./native/blocked_response_tls/main.go
+            chmod 0755 "module/bin/$abi/blocked_response_tls"
+            test -s "module/bin/$abi/blocked_response_tls"
+          done
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
@@ -101,6 +125,8 @@ jobs:
           test -s module/hosts_target_safe.sh
           test -s module/hosts_reset_safe.sh
           test -s module/response_mode.sh
+          test -s module/https_response.sh
+          for abi in arm64-v8a armeabi-v7a x86_64; do test -x "module/bin/$abi/blocked_response_tls"; done
           for abi in arm64-v8a armeabi-v7a x86_64; do test -x "module/bin/$abi/blocked_response"; done
           test -s module/data/r3-lab-signatures.tsv
           test -s module/data/tracker-signatures.tsv

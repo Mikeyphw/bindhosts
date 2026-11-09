@@ -1,9 +1,11 @@
 #!/system/bin/sh
-# UX04 optional localhost blocked-image responder. Default OFF, HTTP only.
+# UX04 HTTP + UX07 optional HTTPS blocked-image responder. Default OFF.
 set -eu
 umask 077
 [ "$#" -ge 3 ] || { echo 'BH_RESPONSE_ERROR: usage STATE TARGET status|start|set [off|transparent|logo]' >&2; exit 2; }
 STATE=$1; TARGET=$2; CMD=$3; [ "$#" -le 3 ] || shift 3
+# UX04 test harness runs without privileged Android context.
+[ "${BH_RESPONSE_TEST_MODE:-0}" != 1 ] || export BH_HTTPS_TEST_MODE=1
 MODDIR=${BH_RESPONSE_MODDIR:-/data/adb/modules/bindhosts}
 MODE_FILE="$STATE/response.mode"; PIDFILE="$STATE/response.pid"
 WRITER="$MODDIR/hosts_target_safe.sh"
@@ -103,11 +105,20 @@ switch_hosts() {
 }
 case "$CMD" in
   stop)
+    if [ -f "$MODDIR/https_response.sh" ]; then
+      sh "$MODDIR/https_response.sh" "$STATE" "$TARGET" stop || :
+    fi
     stop_server; echo BH_RESPONSE_STOPPED ;;
   status)
     echo "mode=$MODE"
     if [ "$MODE" != off ] && probe "$MODE"; then echo 'server=running'; else echo 'server=not_running'; fi
-    echo 'https_replacement=unsupported'
+    if [ -f "$MODDIR/https_response.sh" ]; then
+      sh "$MODDIR/https_response.sh" "$STATE" "$TARGET" status
+    else
+      echo 'https_mode=unsupported'
+    fi
+    echo 'https_replacement=conditional_user_ca_trust_required'
+
     ;;
   start)
     if [ "$MODE" != off ]; then
@@ -120,10 +131,21 @@ case "$CMD" in
         else
           echo 'BH_RESPONSE_RECOVERY_REQUIRED: cannot restore standard mappings' >&2
         fi
+        if [ -f "$MODDIR/https_response.sh" ]; then
+          sh "$MODDIR/https_response.sh" "$STATE" "$TARGET" disable >/dev/null 2>&1 || :
+        fi
         exit 1
       fi
     fi
+    if [ -f "$MODDIR/https_response.sh" ]; then
+      sh "$MODDIR/https_response.sh" "$STATE" "$TARGET" start ||
+        echo 'BH_RESPONSE_HTTPS_BOOT_FAILED_DISABLED: HTTP remains active' >&2
+    fi
     ;;
+  https)
+    [ -f "$MODDIR/https_response.sh" ] || { echo 'BH_RESPONSE_ERROR: UX07 backend missing' >&2; exit 1; }
+    [ "$#" -eq 1 ] || { echo 'BH_RESPONSE_ERROR: https requires one action' >&2; exit 2; }
+    sh "$MODDIR/https_response.sh" "$STATE" "$TARGET" "$1" ;;
   set)
     [ "$#" -eq 1 ] || { echo 'BH_RESPONSE_ERROR: set requires mode' >&2; exit 2; }
     WANTED=$1
@@ -136,7 +158,12 @@ case "$CMD" in
         echo 'BH_RESPONSE_SERVER_REPAIRED'
       fi
       if [ "$MODE" = off ]; then stop_server; fi
+      if [ -f "$MODDIR/https_response.sh" ]; then
+        sh "$MODDIR/https_response.sh" "$STATE" "$TARGET" sync ||
+          echo 'BH_RESPONSE_HTTPS_SYNC_FAILED_DISABLED' >&2
+      fi
       echo 'BH_RESPONSE_MODE_UNCHANGED'
+
       exit 0
     fi
     if [ "$WANTED" = off ]; then
@@ -149,6 +176,9 @@ case "$CMD" in
         exit 1
       fi
       stop_server
+      if [ -f "$MODDIR/https_response.sh" ]; then
+        sh "$MODDIR/https_response.sh" "$STATE" "$TARGET" disable || :
+      fi
     else
       start_server "$WANTED" || exit 1
       # Save mode before mapping hosts; a crash leaves a boot-restartable server.
@@ -163,6 +193,10 @@ case "$CMD" in
         echo 'BH_RESPONSE_ERROR: hosts unchanged; response mode rolled back' >&2
         exit 1
       fi
+    fi
+    if [ -f "$MODDIR/https_response.sh" ]; then
+      sh "$MODDIR/https_response.sh" "$STATE" "$TARGET" sync ||
+        echo 'BH_RESPONSE_HTTPS_SYNC_FAILED_DISABLED: HTTP still active' >&2
     fi
     echo "BH_RESPONSE_MODE_PASS: $WANTED"
     ;;
