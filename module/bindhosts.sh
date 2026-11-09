@@ -317,88 +317,11 @@ toggle_updatejson() {
 	fi
 }
 
-# probe for downloaders
-# wget = low pref, no ssl.
-# curl, has ssl on android, we use it if found
-# here we chant the https meme.
-# https doesn't hide the fact that i'm using https so that's why i don't use encryption 
-# because everyone is trying to crack encryption so i just don't use encryption because 
-# no one is looking at unencrypted data because everyone wants encrypted data to crack
-if curl --version > /dev/null 2>&1; then
-	download() { curl --connect-timeout 10 --max-time 30 -Ls "$1"; }
-else
-	download() { busybox wget -T 10 --no-check-certificate -qO - "$1"; }
-fi
-
+# UX02: validate every source and build complete hosts in an isolated staging directory.
+# Never write partial downloaded lists into active hosts, even when a source fails.
 adblock() {
-	illusion
-	# source processing start!
-	echo "[+] processing sources"
-	sources=$(sed 's/#.*//' $PERSISTENT_DIR/sources.txt | grep -v "^disabled" | grep http)
-	if [ -z "$sources" ]; then
-		echo "[x] no sources found 😭"
-		echo "[x] sources.txt needs correction 💢"
-		return
-	fi
-
-	# download routine start!
-	successful_downloads=0
-	total_downloads=0
-	for url in $sources ; do
-		total_downloads=$((total_downloads + 1))
-		echo "[>] fetching $url"
-		if download "$url" >> "$rwdir/temphosts"; then
-			successful_downloads=$((successful_downloads + 1))
-			echo "" >> "$rwdir/temphosts"
-		else
-			echo "[x] failed downloading $url"
-		fi
-	done
-
-	# if all downloads failed we are probably offline, abort the update.
-	if [ "$successful_downloads" -eq 0 ] && [ "$total_downloads" -gt 0 ]; then
-		echo "[!] all downloads failed, aborting update."
-		echo "[!] keeping existing hosts file."
-		rm -f "$rwdir/temphosts"
-		return
-	fi
-
-	# if temphosts is empty (can happen if sources were valid but returned no content)
-	[ ! -s "$rwdir/temphosts" ] && {
-		echo "[!] downloaded hosts content is empty"
-		echo "[!] using old hosts file!"
-		# strip first two lines since thats just localhost
-		tail -n +3 $target_hostsfile > "$rwdir/temphosts"
-		}
-	# localhost
-	printf "127.0.0.1 localhost\n::1 localhost\n" > $target_hostsfile
-	# always restore user's custom rules
-	sed 's/#.*//; /^$/d; s/\r$//; s/^disabled|//g' $PERSISTENT_DIR/custom*.txt >> $target_hostsfile
-	# blacklist.txt
-	for i in $(sed 's/#.*//' $PERSISTENT_DIR/blacklist.txt ); do echo "0.0.0.0 $i" >> "$rwdir/temphosts"; done
-	# whitelist.txt
-	echo "[+] processing whitelist"
-	# make sure tempwhitelist isnt empty
-	# or it will grep out nothingness from everything
-	# which actually greps out everything.
-	echo "256.256.256.256 bindhosts" > "$rwdir/tempwhitelist"
-	for url in $(sed 's/#.*//' $PERSISTENT_DIR/sources_whitelist.txt | grep http) ; do
-		echo "[>] fetching $url"
-		download "$url" >> "$rwdir/remote_whitelist" || echo "[x] failed downloading $url"
-	done
-	# if there is a remote whitelist, we clean it up
-	if [ -f "$rwdir/remote_whitelist" ]; then
-		sed -i 's/#.*//; /!/d; s/  */ /g; /^$/d; s/\r$//' "$rwdir/remote_whitelist"
-		for i in $(sort -u "$rwdir/remote_whitelist" ); do echo "$i" ; done >> "$rwdir/tempwhitelist"
-	fi
-	for i in $(sed 's/#.*//' $PERSISTENT_DIR/whitelist.txt); do echo "$i" ; done >> "$rwdir/tempwhitelist"
-	# sed strip out everything with # and !, double space to single space, delete empty lines, dos2unix (CRLF), replace all 127.0.0.1 to 0.0.0.0
-	# then sort uniq, then grep out whitelist.txt from it
-	sed -i 's/#.*//; /!/d; s/  */ /g; /^$/d; s/\r$//; s/127.0.0.1/0.0.0.0/g' "$rwdir/temphosts"
-	# no need to -x on grep, allow wildmatches! bindhosts/issue #112
-	sort -u "$rwdir/temphosts" | grep -Fvf "$rwdir/tempwhitelist" >> $target_hostsfile
-	# mark it, will be read by service.sh to deduce
-	echo "# bindhosts v$versionCode" >> $target_hostsfile
+    illusion
+    sh "$MODDIR/hosts_update_safe.sh" "$PERSISTENT_DIR" "$target_hostsfile" "$rwdir" "$versionCode"
 }
 
 reset() {
@@ -415,7 +338,8 @@ reset() {
 }
 
 run() {
-	adblock
+    # A failed fetch/validation must never update module status or bindhosts_state.
+    adblock || { rm -f "$rwdir/bindhosts_lockfile"; echo '[x] UX02: keeping previous hosts'; exit 1; }
 	# store these as variables
 	# this way we dont do the grepping twice
 	custom=$( grep -vEc "0.0.0.0| localhost|#" $target_hostsfile)
@@ -568,13 +492,27 @@ hosts_query () {
 }
 
 instant_whitelist() {
-	# Backend for WebUI: whitelist domain instantly without re-run action
-	shift
-	[ -n "$1" ] || return
-	cp $target_hostsfile $rwdir/temphosts
-	sed "/0.0.0.0 $1/d" $rwdir/temphosts > $target_hostsfile
-	grep -qx "$1" "$PERSISTENT_DIR/whitelist.txt" || echo "$1" >> "$PERSISTENT_DIR/whitelist.txt"
-	rm $rwdir/temphosts
+    shift
+    [ "$#" -gt 0 ] || return 1
+    for _bh_domain in "$@"; do
+        # Dynamic strings from installed hosts never enter sed expressions or shell code.
+        printf '%s\n' "$_bh_domain" | LC_ALL=C grep -Eq '^[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$' || {
+            echo '[x] UX02: unsafe allowlist domain rejected' >&2; return 1;
+        }
+        _bh_encoded=$(printf '%s' "$_bh_domain" | base64 | tr -d '\n')
+        sh "$MODDIR/hosts_config_safe.sh" add whitelist "$_bh_encoded" || return 1
+        _bh_tmp=$(mktemp "$rwdir/bh-unblock.XXXXXXXX") || return 1
+        _bh_old=$(mktemp "$rwdir/bh-unblock-prev.XXXXXXXX") || { rm -f "$_bh_tmp"; return 1; }
+        cp -p "$target_hostsfile" "$_bh_old" || { rm -f "$_bh_tmp" "$_bh_old"; return 1; }
+        if ! awk -v domain="$_bh_domain" '!(($1=="0.0.0.0" || $1=="127.0.0.1") && $2==domain)' "$target_hostsfile" > "$_bh_tmp"; then
+            rm -f "$_bh_tmp" "$_bh_old"; return 1
+        fi
+        if ! cat "$_bh_tmp" > "$target_hostsfile" || ! cmp -s "$_bh_tmp" "$target_hostsfile"; then
+            cat "$_bh_old" > "$target_hostsfile" || echo '[!] UX02: unable to restore hosts after failed immediate allowlist' >&2
+            rm -f "$_bh_tmp" "$_bh_old"; return 1
+        fi
+        rm -f "$_bh_tmp" "$_bh_old"
+    done
 }
 
 setup_link() {

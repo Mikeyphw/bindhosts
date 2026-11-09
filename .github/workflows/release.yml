@@ -53,6 +53,14 @@ jobs:
         python3 tests/test_trackerguard_r1.py
         python3 tests/test_scanner_install_permissions.py
         python3 tests/test_trackerguard_r2.py
+        python3 tests/test_source_catalog.py
+        python3 tests/test_webui_ux01.py
+        sh -n module/hosts_config_safe.sh
+        sh -n module/hosts_update_safe.sh
+        sh -n module/bindhosts.sh
+        python3 tests/test_hosts_config_safe.py
+        python3 tests/test_hosts_update_safe.py
+        python3 tests/test_webui_ux02.py
 
     - name: Setup pnpm
       uses: pnpm/action-setup@v6
