@@ -6,10 +6,24 @@ PERSISTENT_DIR="/data/adb/bindhosts"
 SUSFS_BIN="/data/adb/ksu/bin/ksu_susfs"
 
 # always try to prepare hosts file
-if [ ! -f $MODDIR/system/etc/hosts ]; then
-	mkdir -p $MODDIR/system/etc
-	cat /system/etc/hosts > $MODDIR/system/etc/hosts
-	printf "127.0.0.1 localhost\n::1 localhost\n" >> "$MODPATH/system/etc/hosts"
+# The first boot target must be a real file, not a symlink to /system/etc.
+[ ! -L "$MODDIR/system/etc/hosts" ] || exit 1
+if [ ! -f "$MODDIR/system/etc/hosts" ]; then
+    # R3 HF01: stage beside destination for atomic publication, never use
+    # ambient MODPATH. Same-directory staging is necessary at boot; generic
+    # build/test scratch remains under TMPDIR.
+    mkdir -p "$MODDIR/system/etc" || exit 1
+    _bh_init_tmp=$(mktemp "$MODDIR/system/etc/.hosts-init.XXXXXXXX") || exit 1
+    if ! { cat /system/etc/hosts && printf '127.0.0.1 localhost\n::1 localhost\n'; } > "$_bh_init_tmp"; then
+        rm -f "$_bh_init_tmp"
+        exit 1
+    fi
+    [ -s "$_bh_init_tmp" ] || { rm -f "$_bh_init_tmp"; exit 1; }
+    mv -f "$_bh_init_tmp" "$MODDIR/system/etc/hosts" || {
+        rm -f "$_bh_init_tmp"
+        exit 1
+    }
+    unset _bh_init_tmp
 fi
 hosts_set_perm "$MODDIR/system/etc/hosts"
 

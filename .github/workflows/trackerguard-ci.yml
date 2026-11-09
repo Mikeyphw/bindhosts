@@ -48,6 +48,11 @@ jobs:
           sh -n module/config_backup_safe.sh
           python3 tests/test_backup_safe_ux06.py
           python3 tests/test_webui_ux06.py
+      - name: TrackerGuard R3 offline lifecycle and fail-closed tests
+        run: |
+          python3 tests/test_trackerguard_r3.py
+          python3 tests/test_service_recovery_r3.py
+          python3 -m py_compile tests/trackerguard-r3/run_device_acceptance.py
       - name: Setup Android SDK tools
         uses: android-actions/setup-android@v4
         with:
@@ -97,6 +102,7 @@ jobs:
           test -s module/hosts_reset_safe.sh
           test -s module/response_mode.sh
           for abi in arm64-v8a armeabi-v7a x86_64; do test -x "module/bin/$abi/blocked_response"; done
+          test -s module/data/r3-lab-signatures.tsv
           test -s module/data/tracker-signatures.tsv
           for abi in arm64-v8a armeabi-v7a x86_64; do test -x "module/bin/$abi/axmlscan"; done
           test -f module/webroot/index.html

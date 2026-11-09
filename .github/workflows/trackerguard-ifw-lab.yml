@@ -21,6 +21,9 @@ jobs:
         run: |
           python3 tests/ifw-lab/tests/test_contract.py
           sh -n tests/ifw-lab/run-device-test.sh
+          python3 tests/test_trackerguard_r3.py
+          python3 tests/test_service_recovery_r3.py
+          python3 -m py_compile tests/trackerguard-r3/run_device_acceptance.py
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
@@ -50,10 +53,46 @@ jobs:
           ! "$AAPT" dump permissions "$APK" | grep -q 'uses-permission:'
           "$AAPT" dump xmltree "$APK" AndroidManifest.xml | grep -F 'ProbeReceiver'
           sha256sum "$APK"
+      - name: Preserve R3 version 1 APK for lifecycle acceptance
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=tests/ifw-lab/app/build/outputs/apk/debug/app-debug.apk
+          mkdir -p "$RUNNER_TEMP/r3-lab"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep -Fq "versionCode='1'"
+          cp "$APK" "$RUNNER_TEMP/r3-lab/lab-v1.apk"
       - name: Upload standalone APK
         uses: actions/upload-artifact@v4
         with:
           name: trackerguard-ifw-lab-debug
           path: tests/ifw-lab/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+      - name: Build R3 version 2 APK using hosted Gradle
+        run: gradle --no-daemon -p tests/ifw-lab -PtgLabVersionCode=2 :app:assembleDebug --stacktrace
+      - name: Verify R3 version 2 metadata and distinct APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=tests/ifw-lab/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          AAPT="$ANDROID_HOME/build-tools/35.0.0/aapt"
+          "$AAPT" dump badging "$APK" | grep -Fq "versionCode='2'"
+          "$AAPT" dump badging "$APK" | grep -Fq "package: name='com.mikeyphw.trackerguard.ifwlab'"
+          ! "$AAPT" dump permissions "$APK" | grep -q 'uses-permission:'
+          ! cmp -s "$APK" "$RUNNER_TEMP/r3-lab/lab-v1.apk"
+          cp "$APK" "$RUNNER_TEMP/r3-lab/lab-v2.apk"
+      - name: Upload R3 version 1 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: trackerguard-ifw-lab-v1
+          path: ${{ runner.temp }}/r3-lab/lab-v1.apk
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload R3 version 2 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: trackerguard-ifw-lab-v2
+          path: ${{ runner.temp }}/r3-lab/lab-v2.apk
           if-no-files-found: error
           retention-days: 14
