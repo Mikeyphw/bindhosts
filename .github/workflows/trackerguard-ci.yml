@@ -22,6 +22,8 @@ jobs:
         run: TG_R1_MODDIR="$PWD/module" sh tests/test_trackerguard.sh
       - name: R1 native binary manifest and CLI regression tests
         run: python3 tests/test_trackerguard_r1.py
+      - name: KernelSU native scanner install permissions
+        run: python3 tests/test_scanner_install_permissions.py
       - name: Setup Android SDK tools
         uses: android-actions/setup-android@v4
         with:

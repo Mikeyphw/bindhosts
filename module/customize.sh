@@ -57,6 +57,19 @@ mkdir -p "$MODPATH/system/etc"
 # set permissions to bindhosts.sh
 busybox chmod +x "$MODPATH/bindhosts.sh"
 busybox chmod +x "$MODPATH/bindhosts-app.sh"
+
+# TG_SCANNER_PERMISSIONS_BEGIN: KernelSU resets ordinary module files to 0644.
+# Built native scanners are data-directory executables, not system/bin files.
+# set_perm is provided by Magisk, KernelSU and APatch module installers.
+for tg_abi in arm64-v8a armeabi-v7a x86_64; do
+    tg_scanner="$MODPATH/bin/$tg_abi/axmlscan"
+    [ -s "$tg_scanner" ] || abort "TrackerGuard: missing native scanner for $tg_abi"
+    set_perm "$tg_scanner" 0 0 0755
+    [ -x "$tg_scanner" ] || abort "TrackerGuard: native scanner not executable for $tg_abi"
+done
+unset tg_abi tg_scanner
+# TG_SCANNER_PERMISSIONS_END
+
 # symlink bindhosts to manager path
 # for ez termux usage
 manager_paths="/data/adb/ap/bin /data/adb/ksu/bin"
