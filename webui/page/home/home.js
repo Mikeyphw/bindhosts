@@ -265,6 +265,11 @@ function loadMoreHosts(callback) {
  */
 async function handleRemove(event, domains) {
     const hostList = document.querySelector('.host-list-item');
+    // Installed hosts entries are untrusted text; only DNS names may become CLI arguments.
+    if (!domains.every(d => /^[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$/.test(d))) {
+        showPrompt('Invalid hostname; no action taken.', false);
+        return;
+    }
     const result = await exec(`sh ${moduleDirectory}/bindhosts.sh --whitelist ${domains.join(' ')}`);
     if (result.errno === 0) {
         // Find and remove the element directly

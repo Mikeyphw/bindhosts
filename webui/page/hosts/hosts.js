@@ -1,4 +1,6 @@
 import { escapeHtml } from '../../utils/safe_text.js';
+import { secureAdd, secureRemove, secureToggle, secureReplaceLine, secureDeleteCustom,
+         secureRenameCustom, secureImportCustom, secureFileSize, secureSaveFile } from '../../utils/hosts_secure_io.js';
 import { exec, spawn } from 'kernelsu-alt';
 import { showPrompt, basePath, moduleDirectory, filePaths, fetchText, updateUIVisibility } from '../../utils/util.js';
 import { getString } from '../../utils/language.js';
@@ -128,11 +130,15 @@ function displayHostsList(lines, fileType) {
         const checkbox = listItem.querySelector("md-checkbox");
         if (checkbox) {
             checkbox.checked = !isDisabled;
-            checkbox.addEventListener('change', () => {
-                const command = isDisabled ? `s,${line},${line.replace(/^disabled\|/, '')},` : `s,${line},disabled|${line},`;
-                exec(`sed -i '${command}' ${basePath}/${filePaths[fileType]}`).then((result) => {
-                    loadFile(fileType);
-                });
+            checkbox.addEventListener('change', async () => {
+                checkbox.disabled = true;
+                try {
+                    await secureToggle(fileType, line);
+                    await loadFile(fileType);
+                } catch (err) {
+                    checkbox.checked = !checkbox.checked;
+                    showPrompt(`Cannot toggle rule: ${err.message}`, false);
+                } finally { checkbox.disabled = false; }
             });
         }
         const removeEntry = () => {
@@ -148,25 +154,23 @@ function displayHostsList(lines, fileType) {
             listItem.remove();
         };
 
-        // Remove line from file
+        // Remove individual entries using exact-match, transactional root operations.
         if (deleteLine) {
             deleteLine.onclick = async () => {
-                await exec(`
-                    filtered=$(grep -vxF '${line}' ${basePath}/${filePaths[fileType]})
-                    echo "$filtered" > ${basePath}/${filePaths[fileType]}
-                `);
-                removeEntry();
+                try {
+                    await secureRemove(fileType, line);
+                    removeEntry();
+                } catch (err) { showPrompt(`Cannot remove entry: ${err.message}`, false); }
             };
         }
-        // Remove file
         if (deleteFile) {
             deleteFile.onclick = async () => {
-                const fileName = listItem.querySelector(".link-text").textContent;
-                const remove = await removeCustomHostsFile(fileName);
-                if (remove) {
-                    await exec(`rm -f "${basePath}/${fileName}"`);
+                const fileName = listItem.querySelector('.link-text').textContent;
+                if (!(await removeCustomHostsFile(fileName))) return;
+                try {
+                    await secureDeleteCustom(fileName);
                     removeEntry();
-                }
+                } catch (err) { showPrompt(`Cannot delete custom file: ${err.message}`, false); }
             };
         }
         // Edit file
@@ -218,25 +222,16 @@ function displayHostsList(lines, fileType) {
  */
 async function handleAdd(fileType, prompt) {
     const inputElement = document.getElementById(`${fileType}-input`);
-    const inputValue = inputElement.value.trim();
-    console.log(`Input value for ${fileType}: "${inputValue}"`);
-    if (inputValue === "") return;
-    const inputLines = inputValue.split('\n').map(line => line.trim()).filter(line => line !== "");
+    const lines = inputElement.value.split('\n').map(s => s.trim()).filter(Boolean);
+    if (!lines.length) return;
     try {
-        const fileContent = await fetchText('link/PERSISTENT_DIR/' + filePaths[fileType], `${basePath}/${filePaths[fileType]}`).catch(() => "");
-        const existingLines = fileContent.split('\n').map(line => line.trim()).filter(line => line !== "");
-
-        for (const line of inputLines) {
-            if (existingLines.includes(line)) {
-                showPrompt(getString(prompt, line), false, 2000);
-                continue;
-            }
-            await exec(`echo "${line}" >> ${basePath}/${filePaths[fileType]}`);
-        }
-        inputElement.value = ""; // Clear input if add successful
-        loadFile(fileType);
-    } catch(error) {
-        console.error(`Failed to process input for ${fileType}: ${error}`);
+        for (const line of lines) await secureAdd(fileType, line);
+        inputElement.value = '';
+        await loadFile(fileType);
+        showPrompt('Rules saved. Run Update to rebuild hosts.');
+    } catch (err) {
+        showPrompt(`Cannot save: ${err.message}`, false);
+        // Keep user input for repair. Previously failed writes could silently disappear.
     }
 }
 
@@ -490,23 +485,15 @@ function getCustomHostsList() {
  * @returns {void}
  */
 async function importCustomHost() {
-    const filePath = await FileSelector.getFilePath("txt");
-    if (filePath) {
-        const fileName = filePath.split('/').pop().replace(/ /g, '_');
-        const destPath = `${basePath}/custom_${fileName}`;
-        const result = await exec(`
-            cp -f "${filePath}" "${destPath}"
-            chmod 644 "${destPath}"
-        `);
-        if (result.errno === 0) {
-            showPrompt(getString('global_saved', destPath));
-            await new Promise(resolve => setTimeout(resolve, 100));
-            getCustomHostsList();
-        } else {
-            showPrompt(getString('global_save_fail'), false);
-            console.error('Error copying file:', result.stderr);
-        }
-    }
+    const filePath = await FileSelector.getFilePath('txt');
+    if (!filePath) return;
+    const basename = filePath.split('/').pop().replace(/[^A-Za-z0-9_.-]/g, '_');
+    const dest = `custom_${basename}`;
+    try {
+        await secureImportCustom(filePath, dest);
+        showPrompt(getString('global_saved', dest));
+        getCustomHostsList();
+    } catch (err) { showPrompt(`Import refused: ${err.message}`, false); }
 }
 
 /**
@@ -544,8 +531,8 @@ async function fileNameEditor(fileName) {
     const rawFileName = fileName.replace("custom", "").replace(".txt", "");
     fileNameInput.value = rawFileName;
     // Editor support for file smaller than 128KB
-    const result = await exec(`[ $(wc -c < ${basePath}/${fileName}) -lt 131072 ] || exit 1`);
-    if (result.errno === 0) {
+    const size = await secureFileSize(fileName).catch(() => Number.POSITIVE_INFINITY);
+    if (size < 131072) {
         const content = await fetchText(`link/PERSISTENT_DIR/${fileName}`, `${basePath}/${fileName}`).catch(() => "");
         setEditorValue(content);
         openFileEditor(fileName);
@@ -724,33 +711,21 @@ function openFileEditor(lastFileName, openEditor = true) {
             showPrompt(getString('global_file_name_empty'), false);
             return;
         }
-        let command;
         const isSystemFile = Object.values(filePaths).includes(lastFileName);
-        if (isSystemFile) {
-            // Save system file directly
-            command = `
-                cat << 'HostEditorEOF' > ${basePath}/${lastFileName}
-${content}
-HostEditorEOF
-                chmod 644 ${basePath}/${lastFileName}`;
-        } else if (openEditor) {
-            // Save custom file
-            command = `
-                [ ! -f ${basePath}/${lastFileName} ] || rm -f ${basePath}/${lastFileName}
-                cat << 'HostEditorEOF' > ${basePath}/custom${newFileName}.txt
-${content}
-HostEditorEOF
-                chmod 644 ${basePath}/custom${newFileName}.txt`;
-        } else {
-            // Rename file
-            command = `mv -f ${basePath}/${lastFileName} ${basePath}/custom${newFileName}.txt`;
-        }
-        const result = await exec(command);
-        if (result.errno === 0) {
-            showPrompt(getString('global_saved', `${basePath}/custom${newFileName}.txt`));
-        } else {
-            showPrompt(getString('global_save_fail'), false);
-            console.error("Failed to save file:", result.stderr);
+        const newFile = isSystemFile ? lastFileName : `custom${newFileName}.txt`;
+        try {
+            if (isSystemFile) {
+                await secureSaveFile(lastFileName, content);
+            } else if (openEditor) {
+                await secureSaveFile(lastFileName, content);
+                if (newFile !== lastFileName) await secureRenameCustom(lastFileName, newFile);
+            } else if (newFile !== lastFileName) {
+                await secureRenameCustom(lastFileName, newFile);
+            }
+            showPrompt(getString('global_saved', newFile));
+        } catch (err) {
+            showPrompt(`Save refused: ${err.message}`, false);
+            return; // Keep editor open and preserve unsaved content.
         }
         getCustomHostsList();
         closeEditor();
@@ -770,21 +745,19 @@ function setupRenameDialog() {
         }
     });
     renameDialog.querySelector('.close-btn').onclick = () => renameDialog.close();
-    document.getElementById('edit-hosts-confirm').onclick = () => {
+    document.getElementById('edit-hosts-confirm').onclick = async () => {
         const currentLine = renameDialog.dataset.currentLine;
         const fileType = renameDialog.dataset.fileType;
-        const isDisabled = renameDialog.dataset.isDisabled === "true";
-
-        const newLink = renameDialog.querySelector('#edit-hosts-link').value;
-        const newName = renameDialog.querySelector('#edit-hosts-name').value;
-        let newLine = `${isDisabled ? 'disabled\|' : ''}${newLink}`;
+        const isDisabled = renameDialog.dataset.isDisabled === 'true';
+        const newLink = renameDialog.querySelector('#edit-hosts-link').value.trim();
+        const newName = renameDialog.querySelector('#edit-hosts-name').value.trim();
+        let newLine = `${isDisabled ? 'disabled|' : ''}${newLink}`;
         if (newName) newLine += ` # ${newName}`;
-        const command = `s,${currentLine},${newLine},`;
-
-        exec(`sed -i '${command}' ${basePath}/${filePaths[fileType]}`).then(() => {
-            loadFile(fileType);
-        });
-        renameDialog.close();
+        try {
+            await secureReplaceLine(fileType, currentLine, newLine);
+            await loadFile(fileType);
+            renameDialog.close();
+        } catch (err) { showPrompt(`Edit refused: ${err.message}`, false); }
     };
 }
 

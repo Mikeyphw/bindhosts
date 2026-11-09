@@ -6,6 +6,13 @@ on:
     paths:
       - 'webui/**'
       - 'module/source_catalog.sh'
+      - 'module/hosts_config_safe.sh'
+      - 'module/hosts_update_safe.sh'
+      - 'module/hosts_update_parse.awk'
+      - 'module/bindhosts.sh'
+      - 'tests/test_hosts_config_safe.py'
+      - 'tests/test_hosts_update_safe.py'
+      - 'tests/test_webui_ux02.py'
       - 'module/data/source-catalog.tsv'
       - 'tests/test_source_catalog.py'
       - 'tests/test_webui_ux01.py'
@@ -23,6 +30,14 @@ jobs:
           sh -n module/source_catalog.sh
           python3 -m unittest discover -s tests -p 'test_source_catalog.py' -v
           python3 -m unittest discover -s tests -p 'test_webui_ux01.py' -v
+      - name: UX02 transactional hosts/config regression tests
+        run: |
+          sh -n module/hosts_config_safe.sh
+          sh -n module/hosts_update_safe.sh
+          sh -n module/bindhosts.sh
+          python3 -m unittest discover -s tests -p 'test_hosts_config_safe.py' -v
+          python3 -m unittest discover -s tests -p 'test_hosts_update_safe.py' -v
+          python3 -m unittest discover -s tests -p 'test_webui_ux02.py' -v
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
@@ -39,6 +54,8 @@ jobs:
           node --check webui/page/apps/apps.js
           node --check webui/utils/appearance.js
           node --check webui/utils/safe_text.js
+          node --check webui/utils/hosts_secure_io.js
+          node --check webui/page/hosts/hosts.js
       - name: Build WebUI
         run: |
           cd webui
@@ -47,11 +64,14 @@ jobs:
           test -s ../module/webroot/index.html
       - name: Verify module payload
         run: |
+          test -s module/hosts_config_safe.sh
+          test -s module/hosts_update_safe.sh
+          test -s module/hosts_update_parse.awk
           test -s module/source_catalog.sh
           test -s module/data/source-catalog.tsv
           test -s module/webroot/index.html
       - name: Upload built WebUI for inspection
         uses: actions/upload-artifact@v4
         with:
-          name: bindhosts-ux01-webroot
+          name: bindhosts-ux02-webroot
           path: module/webroot/
