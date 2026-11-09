@@ -1,0 +1,50 @@
+<div class="ux-content ux05-content">
+  <header class="ux-page-heading">
+    <p class="ux-eyebrow">LOCAL OPERATION HISTORY</p>
+    <h1>Activity &amp; diagnostics</h1>
+    <p>Read-only history of hosts, TrackerGuard, recovery, and HTTP responder operations.</p>
+  </header>
+  <div class="ux05-actions">
+    <button type="button" class="ux-secondary-button" id="ux05-back">Back to More</button>
+    <button type="button" class="ux-secondary-button" id="ux05-refresh">Refresh</button>
+  </div>
+  <section class="ux-card" aria-label="Current status">
+    <h2>Current status</h2>
+    <div class="ux05-stats">
+      <div><strong id="ux05-events">—</strong><small>Recorded events</small></div>
+      <div><strong id="ux05-fails">—</strong><small>Failures</small></div>
+      <div><strong id="ux05-sources">—</strong><small>Enabled sources</small></div>
+    </div>
+    <p id="ux05-health" role="status" aria-live="polite" class="ux05-note">Loading local diagnostics…</p>
+    <p id="ux05-last-ok" class="ux05-note"></p>
+  </section>
+  <section class="ux-card" aria-labelledby="ux05-history-title">
+    <div class="ux05-section-head">
+      <h2 id="ux05-history-title">Recent operations</h2>
+      <label class="ux05-filter">Show
+        <select id="ux05-result-filter" aria-label="Filter event outcome">
+          <option value="all">All</option>
+          <option value="fail">Failures</option>
+          <option value="ok">Successful</option>
+          <option value="warning">Warnings</option>
+        </select>
+      </label>
+    </div>
+    <p class="ux05-note">Latest 100 receipts. New history starts when UX05 is installed; older unstructured logs are not imported.</p>
+    <div id="ux05-event-list" aria-live="polite"></div>
+  </section>
+  <section class="ux-card" aria-labelledby="ux05-export-title">
+    <h2 id="ux05-export-title">Shareable diagnostic report</h2>
+    <p class="ux05-note">Optional. Exports redacted operation codes, timestamps, status counts and module version. Excludes URLs, domains, hosts contents, IFW components and package names.</p>
+    <button type="button" class="ux-primary-button" id="ux05-export">Export to Downloads</button>
+    <p id="ux05-export-result" class="ux05-path" aria-live="polite"></p>
+  </section>
+  <md-dialog id="ux05-export-confirm">
+    <div slot="headline">Export diagnostic report?</div>
+    <div slot="content">The report contains operation timestamps and results. It is written to shared Downloads and will be accessible to apps with appropriate file permissions. Export only if you want to share it.</div>
+    <div slot="actions">
+      <md-text-button id="ux05-export-cancel">Cancel</md-text-button>
+      <md-text-button id="ux05-export-ok">Export</md-text-button>
+    </div>
+  </md-dialog>
+</div>

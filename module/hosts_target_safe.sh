@@ -17,7 +17,11 @@ if [ "${BH_HOSTS_TEST_MODE:-0}" != 1 ]; then
   esac
 fi
 LOCK="$ROOT/.hosts-target-lock"; JOURNAL="$ROOT/.hosts-target-journal"
-LOCKED=0; NEXT=''; COMMITTED=0
+LOCKED=0; NEXT=''; COMMITTED=0; INPLACE=0
+ux05_receipt() {
+  [ -f "${BH_DIAG_MODDIR:-/data/adb/modules/bindhosts}/ux05_diagnostics.sh" ] || return 0
+  BH_DIAG_STATE="$ROOT" sh "${BH_DIAG_MODDIR:-/data/adb/modules/bindhosts}/ux05_diagnostics.sh" record "$@" >/dev/null 2>&1 || :
+}
 fatal() { echo "BH_TARGET_ERROR: $*" >&2; exit 1; }
 cleanup() {
   [ -z "$NEXT" ] || rm -f "$NEXT"
@@ -39,15 +43,20 @@ repair() {
   previous
   if cmp -s "$JOURNAL/previous" "$TARGET"; then
     rm -rf "$JOURNAL" || fatal 'cannot remove completed recovery journal'
-    echo 'BH_TARGET_ALREADY_RECOVERED'; return 0
+    echo 'BH_TARGET_ALREADY_RECOVERED'
+    ux05_receipt recovery recover ok RECOVERY_ALREADY_DONE
+    return 0
   fi
   # Restore original bytes in place; do not attempt renaming a bind mount.
   if ! cat "$JOURNAL/previous" > "$TARGET" || ! cmp -s "$JOURNAL/previous" "$TARGET"; then
     echo 'BH_TARGET_RESTORE_FAILED: persistent previous snapshot retained' >&2
+    ux05_receipt recovery recover fail RECOVERY_WRITE_FAILED
     return 2
   fi
   rm -rf "$JOURNAL" || fatal 'cannot remove recovered journal'
-  echo 'BH_TARGET_RECOVERED'; return 0
+  echo 'BH_TARGET_RECOVERED'
+  ux05_receipt recovery recover ok RECOVERY_APPLIED
+  return 0
 }
 # Inspection must not create a lock, a journal, or any other on-device state.
 # It is a genuinely read-only operation, including on a read-only state mount.
@@ -94,6 +103,7 @@ if cp "$CANDIDATE" "$NEXT" 2>/dev/null; then
   fi
 fi
 if [ "$COMMITTED" = 0 ]; then
+  INPLACE=1
   [ -z "$NEXT" ] || { rm -f "$NEXT"; NEXT=''; }
   echo 'BH_TARGET_BIND_FALLBACK: verified in-place write with retained crash journal' >&2
   if [ "${BH_HOSTS_TEST_MODE:-0}" = 1 ]; then
@@ -115,3 +125,8 @@ fi
 sync "$TARGET" 2>/dev/null || sync
 rm -rf "$JOURNAL" || fatal 'commit succeeded but journal cleanup failed; recover on boot'
 echo 'BH_TARGET_COMMIT_PASS'
+if [ "$INPLACE" -eq 1 ]; then
+  ux05_receipt hosts commit ok HOSTS_INPLACE_COMMIT
+else
+  ux05_receipt hosts commit ok HOSTS_ATOMIC_COMMIT
+fi

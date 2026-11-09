@@ -67,6 +67,9 @@ jobs:
         python3 tests/test_hosts_target_ux03.py
         python3 tests/test_blocked_response_ux04.py
         python3 tests/test_responder_install_permissions.py
+        sh -n module/ux05_diagnostics.sh
+        python3 tests/test_ux05_diagnostics.py
+        python3 tests/test_ux05_contract.py
 
     - name: Setup pnpm
       uses: pnpm/action-setup@v6
