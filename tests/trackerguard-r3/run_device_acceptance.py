@@ -176,6 +176,7 @@ def acceptance(adb: ADB, apk1: Path, apk2: Path) -> None:
     installed = False
     enrolled = False
     monitored = False
+    baseline_seeded = False
     errors: list[str] = []
     try:
         adb.run("install", "-r", str(apk1), timeout=120)
@@ -190,6 +191,7 @@ def acceptance(adb: ADB, apk1: Path, apk2: Path) -> None:
         baseline = adb.tracker("monitor", "once")
         if "R2_MONITOR_ONCE_PASS" not in baseline:
             raise Refused("R3_BASELINE_SNAPSHOT_FAILED")
+        baseline_seeded = True
         print("TG_R3_BASELINE_SNAPSHOT_PASS", flush=True)
         # Mark ownership before each potentially partially successful command,
         # so cleanup is attempted even if a backend reports failure late.
@@ -245,8 +247,10 @@ def acceptance(adb: ADB, apk1: Path, apk2: Path) -> None:
                 adb.run("uninstall", PKG, timeout=120)
         except Refused as e:
             errors.append("uninstall: " + str(e))
-        try: adb.tracker("monitor", "once")
-        except Refused as e: errors.append("reconcile: " + str(e))
+        # Do not retry cleanup snapshot if initial snapshot never succeeded.
+        if baseline_seeded:
+            try: adb.tracker("monitor", "once")
+            except Refused as e: errors.append("reconcile: " + str(e))
         try:
             after = adb.state_bytes()
             for name in STATE_FILES:
