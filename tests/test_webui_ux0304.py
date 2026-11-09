@@ -29,6 +29,8 @@ class UX0304(unittest.TestCase):
   self.assertIn('UX04_RESPONDER_PERMISSIONS_BEGIN',script)
   self.assertIn('set_perm "$tg_response" 0 0 0755',script)
   self.assertIn('[ -x "$tg_response" ]',script)
+  self.assertLess(script.index('# TG_SCANNER_PERMISSIONS_END'),script.index('# UX04_RESPONDER_PERMISSIONS_BEGIN'))
+  self.assertIn('# UX04_RESPONDER_PERMISSIONS_END',script)
  def test_boot_recovery_and_no_default_server(self):
   sh=(ROOT/'module/service.sh').read_text()
   self.assertIn('hosts_target_safe.sh" recover',sh)

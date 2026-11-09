@@ -28,7 +28,9 @@ jobs:
       - name: R1 native binary manifest and CLI regression tests
         run: python3 tests/test_trackerguard_r1.py
       - name: KernelSU native scanner install permissions
-        run: python3 tests/test_scanner_install_permissions.py
+        run: |
+          python3 tests/test_scanner_install_permissions.py
+          python3 tests/test_responder_install_permissions.py
       - name: R2 opt-in observer and automatic IFW reconciliation tests
         run: python3 tests/test_trackerguard_r2.py
       - name: UX03/UX04 regression tests

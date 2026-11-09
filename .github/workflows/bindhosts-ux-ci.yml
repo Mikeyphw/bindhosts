@@ -12,6 +12,7 @@ on:
       - 'native/blocked_response.c'
       - 'tests/test_hosts_target_ux03.py'
       - 'tests/test_blocked_response_ux04.py'
+      - 'tests/test_responder_install_permissions.py'
       - 'tests/hosts-mount-acceptance.sh'
       - 'tests/test_webui_ux0304.py'
       - 'tests/test_webui_ux02.py'
@@ -55,6 +56,7 @@ jobs:
           sh -n tests/hosts-mount-acceptance.sh
           python3 tests/test_hosts_target_ux03.py
           python3 tests/test_blocked_response_ux04.py
+          python3 tests/test_responder_install_permissions.py
           python3 tests/test_webui_ux0304.py
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
