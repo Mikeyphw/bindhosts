@@ -197,4 +197,13 @@ if [ -s "$PERSISTENT_DIR/trackerguard/rules.tsv" ] && [ -f "$MODDIR/trackerguard
     sh "$MODDIR/trackerguard.sh" apply >> "$PERSISTENT_DIR/trackerguard/boot.log" 2>&1 &
 fi
 
+# R2: restart the opt-in tracker observer after Android finishes booting.
+# Does nothing for users who have not explicitly enabled monitoring.
+if [ -f "$PERSISTENT_DIR/trackerguard/monitor.enabled" ] && [ -f "$MODDIR/trackerguard_r2.sh" ]; then
+    (
+        until [ "$(getprop sys.boot_completed)" = "1" ]; do sleep 5; done
+        sh "$MODDIR/trackerguard.sh" monitor watch
+    ) >> "$PERSISTENT_DIR/trackerguard/monitor.log" 2>&1 &
+fi
+
 # EOF

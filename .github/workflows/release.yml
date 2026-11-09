@@ -52,6 +52,7 @@ jobs:
         TG_R1_MODDIR="$PWD/module" sh tests/test_trackerguard.sh
         python3 tests/test_trackerguard_r1.py
         python3 tests/test_scanner_install_permissions.py
+        python3 tests/test_trackerguard_r2.py
 
     - name: Setup pnpm
       uses: pnpm/action-setup@v6
