@@ -31,10 +31,10 @@ esac
         self.fetcher.chmod(0o755)
         self.hosts=self.root/'fixture_hosts'; self.hosts.write_text('0.0.0.0 ads.example\n0.0.0.0 images.ads.example\n0.0.0.0 trap.otherexample\n')
         self.allow=self.root/'fixture_allow'; self.allow.write_text('*.ads.example\n')
-        self.env=dict(os.environ, BH_UPDATE_MODDIR=str(MOD), BH_UPDATE_TEST_MODE='1', BH_UPDATE_TEST_FETCH=str(self.fetcher), BH_FIXTURE_HOSTS=str(self.hosts), BH_FIXTURE_ALLOW=str(self.allow))
+        self.env=dict(os.environ, BH_UPDATE_MODDIR=str(MOD), BH_UPDATE_TEST_MODE='1', BH_UPDATE_TEST_FETCH=str(self.fetcher), BH_FIXTURE_HOSTS=str(self.hosts), BH_FIXTURE_ALLOW=str(self.allow), BH_HOSTS_TEST_MODE='1', BH_HOSTS_ROOT=str(self.root))
 
     def go(self, ok=True):
-        p=subprocess.run(['sh',str(MOD/'hosts_update_safe.sh'),str(self.root),str(self.active),str(self.work),'21606'],env=self.env,capture_output=True,text=True,timeout=10)
+        p=subprocess.run(['sh',str(MOD/'hosts_update_safe.sh'),str(self.root),str(self.active),str(self.work),'21606'],env=self.env,capture_output=True,text=True,timeout=30)
         if ok: self.assertEqual(p.returncode,0,p.stdout+'\n'+p.stderr)
         return p
 

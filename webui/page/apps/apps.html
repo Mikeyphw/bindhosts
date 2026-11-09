@@ -16,6 +16,14 @@
     <div><strong id="apps-enrolled-count">—</strong><small>Enrolled apps</small></div>
     <div><strong id="apps-total-count">—</strong><small>Total rules</small></div>
   </section>
+  <section class="ux-card ux03-controls" aria-label="TrackerGuard operations">
+    <div><h2>Monitoring and rules</h2><p class="ux-small">Reconcile enrolled apps and inspect rule ownership. Only you can enroll or exclude apps.</p></div>
+    <div class="apps-controls">
+      <button id="apps-scan-once" class="ux-secondary-button" type="button">Check app changes</button>
+      <button id="apps-refresh" class="ux-secondary-button" type="button">Refresh status</button>
+    </div>
+    <div id="apps-rule-list" class="apps-rule-list" aria-live="polite"></div>
+  </section>
   <section class="ux-card apps-selector">
     <label for="apps-search">Find installed apps</label>
     <input id="apps-search" type="search" placeholder="Filter by package name" autocapitalize="none" autocomplete="off" spellcheck="false"/>

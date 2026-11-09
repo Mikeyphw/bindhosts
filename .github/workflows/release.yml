@@ -45,6 +45,9 @@ jobs:
           mkdir -p "module/bin/$abi"
           "$NDK/$compiler" -std=c11 -O2 -fPIE -pie -D_FORTIFY_SOURCE=2 -Wall -Wextra -Werror native/axmlscan.c -o "module/bin/$abi/axmlscan"
           chmod 0755 "module/bin/$abi/axmlscan"
+          "$NDK/$compiler" -std=c11 -O2 -fPIE -pie -D_FORTIFY_SOURCE=2 -Wall -Wextra -Werror \
+            native/blocked_response.c -o "module/bin/$abi/blocked_response"
+          chmod 0755 "module/bin/$abi/blocked_response"
           test -s "module/bin/$abi/axmlscan"
         done
     - name: R0 and R1 regression acceptance
@@ -61,6 +64,8 @@ jobs:
         python3 tests/test_hosts_config_safe.py
         python3 tests/test_hosts_update_safe.py
         python3 tests/test_webui_ux02.py
+        python3 tests/test_hosts_target_ux03.py
+        python3 tests/test_blocked_response_ux04.py
 
     - name: Setup pnpm
       uses: pnpm/action-setup@v6

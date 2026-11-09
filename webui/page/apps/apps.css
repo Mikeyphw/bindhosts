@@ -20,3 +20,7 @@
 .apps-component span {font-size:.83rem;word-break:break-word;}
 .apps-component small {font-size:.74rem;color:var(--md-sys-color-on-surface-variant);}
 @media (max-width:540px){.apps-monitor{flex-direction:column;align-items:stretch}.apps-controls button{flex:1 1 42%;}}
+
+/* UX03: bounded owned-rule details, consistent with existing Material surfaces. */
+.ux03-controls {display:flex;flex-direction:column;gap:8px;}
+.apps-rule-list {max-height:230px;overflow:auto;overflow-wrap:anywhere;}

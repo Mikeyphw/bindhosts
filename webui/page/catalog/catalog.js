@@ -1,4 +1,5 @@
 import { exec } from 'kernelsu-alt';
+import { setupBlockedResponse, refreshBlockedResponse } from '../../utils/blocked_response.js';
 import { moduleDirectory, showPrompt } from '../../utils/util.js';
 import presets from '../../catalog-presets.json';
 
@@ -124,7 +125,7 @@ async function changePreset(preset, action) {
 async function updateHosts() {
     if (busy) return;
     if (!await confirmAction('Update hosts now?',
-        'Download enabled sources and rebuild hosts protection. The existing updater does not yet guarantee atomic rollback; review the result and use a backup if needed.')) return;
+        'Download all enabled sources, validate them, and apply through a journaled hosts writer. For bind mounts the verified in-place fallback is not power-loss atomic.')) return;
     busy = true;
     render();
     view.querySelector('#catalog-status').textContent = 'Updating hosts…';
@@ -143,10 +144,12 @@ async function updateHosts() {
 export function mount(section) {
     view = section;
     view.querySelector('#catalog-update').addEventListener('click', updateHosts);
+    setupBlockedResponse(view, confirmAction);
 }
 
 export function onShow() {
     if (!view) return;
+    refreshBlockedResponse(view);
     refresh().catch(err => {
         view.querySelector('#catalog-status').textContent = `Cannot load catalog: ${err.message}`;
         showPrompt(err.message, false, 4500);

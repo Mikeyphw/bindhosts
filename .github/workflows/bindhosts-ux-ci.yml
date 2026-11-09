@@ -6,6 +6,15 @@ on:
     paths:
       - 'webui/**'
       - 'module/source_catalog.sh'
+      - 'module/hosts_target_safe.sh'
+      - 'module/hosts_reset_safe.sh'
+      - 'module/response_mode.sh'
+      - 'native/blocked_response.c'
+      - 'tests/test_hosts_target_ux03.py'
+      - 'tests/test_blocked_response_ux04.py'
+      - 'tests/hosts-mount-acceptance.sh'
+      - 'tests/test_webui_ux0304.py'
+      - 'tests/test_webui_ux02.py'
       - 'module/hosts_config_safe.sh'
       - 'module/hosts_update_safe.sh'
       - 'module/hosts_update_parse.awk'
@@ -38,6 +47,15 @@ jobs:
           python3 -m unittest discover -s tests -p 'test_hosts_config_safe.py' -v
           python3 -m unittest discover -s tests -p 'test_hosts_update_safe.py' -v
           python3 -m unittest discover -s tests -p 'test_webui_ux02.py' -v
+      - name: UX03+UX04 journal, mounts and localhost responder
+        run: |
+          sh -n module/hosts_target_safe.sh
+          sh -n module/hosts_reset_safe.sh
+          sh -n module/response_mode.sh
+          sh -n tests/hosts-mount-acceptance.sh
+          python3 tests/test_hosts_target_ux03.py
+          python3 tests/test_blocked_response_ux04.py
+          python3 tests/test_webui_ux0304.py
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
@@ -55,6 +73,7 @@ jobs:
           node --check webui/utils/appearance.js
           node --check webui/utils/safe_text.js
           node --check webui/utils/hosts_secure_io.js
+          node --check webui/utils/blocked_response.js
           node --check webui/page/hosts/hosts.js
       - name: Build WebUI
         run: |
@@ -64,6 +83,9 @@ jobs:
           test -s ../module/webroot/index.html
       - name: Verify module payload
         run: |
+          test -s module/hosts_target_safe.sh
+          test -s module/response_mode.sh
+          test -s module/hosts_reset_safe.sh
           test -s module/hosts_config_safe.sh
           test -s module/hosts_update_safe.sh
           test -s module/hosts_update_parse.awk
