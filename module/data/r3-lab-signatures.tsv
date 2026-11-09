@@ -1,0 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# R3 isolated IFW laboratory signature. NEVER included by default.
+# Only used if an operator explicitly sets TG_R1_SIGNATURES to this file.
+# prefix|identifier|review-severity
+com.mikeyphw.trackerguard.ifwlab.|tg-r3-lab|review

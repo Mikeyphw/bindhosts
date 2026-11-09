@@ -73,6 +73,8 @@ jobs:
         sh -n module/config_backup_safe.sh
         python3 tests/test_backup_safe_ux06.py
         python3 tests/test_webui_ux06.py
+        python3 tests/test_trackerguard_r3.py
+        python3 tests/test_service_recovery_r3.py
 
     - name: Setup pnpm
       uses: pnpm/action-setup@v6

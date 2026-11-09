@@ -103,6 +103,26 @@ ksud_kernel_umount() {
 }
 
 ##
+# R3 HF01: a previous interrupted in-place write must be recovered BEFORE
+# the managed hosts file is exposed by bind/redirect mounts. Overlay modes
+# must first mount their upperdir and are therefore handled below.
+if [ -e "$PERSISTENT_DIR/.hosts-target-journal" ] || [ -L "$PERSISTENT_DIR/.hosts-target-journal" ]; then
+    case "$operating_mode" in
+      3) _bh_recover_before_mount=/data/adb/hosts ;;
+      4) _bh_recover_before_mount=/data/adb/hostsredirect/hosts ;;
+      7|8) _bh_recover_before_mount='' ;;
+      *) _bh_recover_before_mount="$MODDIR/system/etc/hosts" ;;
+    esac
+    if [ -n "$_bh_recover_before_mount" ]; then
+        if [ ! -f "$_bh_recover_before_mount" ] ||
+           ! BH_HOSTS_ROOT="$PERSISTENT_DIR" sh "$MODDIR/hosts_target_safe.sh" recover "$_bh_recover_before_mount" >> "$PERSISTENT_DIR/hosts-recovery.log" 2>&1; then
+            echo 'bindhosts: pre-mount hosts recovery failed; refusing mount' >> /dev/kmsg
+            exit 1
+        fi
+    fi
+fi
+unset _bh_recover_before_mount
+
 # check opmodes and then do something
 case $operating_mode in
 	0) normal_mount ;;
@@ -190,8 +210,16 @@ if [ -e "$PERSISTENT_DIR/.ux06-restore-pending" ] && [ -f "$MODDIR/config_backup
       echo 'bindhosts: configuration recovery requires inspection' >> /dev/kmsg
 fi
 # UX03 recover a journal before other services inspect the active hosts file.
-if [ -e "$PERSISTENT_DIR/.hosts-target-journal" ]; then
-    BH_HOSTS_ROOT="$PERSISTENT_DIR" sh "$MODDIR/hosts_target_safe.sh" recover "$target_hostsfile"       >> "$PERSISTENT_DIR/hosts-recovery.log" 2>&1 || echo 'bindhosts: journal recovery failed' >> /dev/kmsg
+if [ -e "$PERSISTENT_DIR/.hosts-target-journal" ] || [ -L "$PERSISTENT_DIR/.hosts-target-journal" ]; then
+    case "$operating_mode" in
+      7|8) # An overlay's target becomes writable/visible only after its mount.
+        BH_HOSTS_ROOT="$PERSISTENT_DIR" sh "$MODDIR/hosts_target_safe.sh" recover "$target_hostsfile" >> "$PERSISTENT_DIR/hosts-recovery.log" 2>&1 || {
+            echo 'bindhosts: overlay hosts recovery failed; refusing further services' >> /dev/kmsg
+            exit 1
+        } ;;
+      *) echo 'bindhosts: journal unexpectedly pending after pre-mount recovery' >> /dev/kmsg
+         exit 1 ;;
+    esac
 fi
 apply_description & #fork in background
 
