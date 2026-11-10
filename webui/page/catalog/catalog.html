@@ -19,8 +19,8 @@
     <p class="ux-small">Source status reports your local configuration, not a verified network download. Preset links are independently maintained by their publishers.</p>
   </section>
   <section class="ux-card" aria-labelledby="response-heading">
-    <h2 id="response-heading">Blocked-page image (HTTP only)</h2>
-    <p class="ux-small">An optional, loopback-only image response. HTTPS cannot show the image. Off by default; your existing blocklists are unchanged until you enable this.</p>
+    <h2 id="response-heading">Blocked-page image (HTTP, optional HTTPS)</h2>
+    <p class="ux-small">Loopback-only blocked images. Plain HTTP works without a certificate; HTTPS requires a separate, explicitly trusted local CA and is never universal. Both are off by default.</p>
     <label for="response-mode">Response style</label>
     <select id="response-mode" class="ux-response-select">
       <option value="off">Standard connection failure</option>
@@ -28,7 +28,22 @@
       <option value="logo">Bindhosts blocked image</option>
     </select>
     <button id="response-apply" type="button" class="ux-secondary-button">Apply response style</button>
-    <p id="response-status" class="ux-small" role="status" aria-live="polite">Reading HTTP response mode…</p>
+    <p id="response-status" class="ux-small" role="status" aria-live="polite">Reading response mode…</p>
+    <div class="ux-card ux-muted-card" id="https-response-panel">
+      <h3>HTTPS image responses (advanced, opt-in)</h3>
+      <p class="ux-small">Generates a private local CA on this device. If you explicitly install and trust that CA in Android, browsers that accept user certificates can see an image for blocked HTTPS hosts. This expands certificate trust: only enable it if you understand the risk. Certificate pinning, app trust rules, ECH and QUIC may still prevent it.</p>
+      <p class="ux-small">The TLS service listens only on 127.0.0.1:443, never forwards connections or logs requests, and issues certificates only for bindhosts-managed blocked domains. Disabling HTTPS does <strong>not</strong> uninstall a CA you manually trusted in Android Settings.</p>
+      <p class="ux-small" id="https-response-status" role="status" aria-live="polite" style="overflow-wrap:anywhere">HTTPS is disabled.</p>
+      <div class="catalog-card-footer" style="display:flex;flex-wrap:wrap;gap:8px">
+        <button type="button" class="ux-secondary-button" id="https-cert-create">Generate local CA</button>
+        <button type="button" class="ux-secondary-button" id="https-cert-export">Export CA certificate</button>
+        <button type="button" class="ux-secondary-button" id="https-response-enable">Enable HTTPS</button>
+        <button type="button" class="ux-secondary-button" id="https-response-disable">Disable HTTPS</button>
+        <button type="button" class="ux-secondary-button" id="https-response-test">Test local TLS</button>
+        <button type="button" class="ux-secondary-button" id="https-certificate-settings">Open Android security settings</button>
+      </div>
+      <p class="ux-small">After exporting, use Android Settings → Security → Encryption &amp; credentials → Install a certificate → CA certificate. Compare the full SHA-256 fingerprint shown above with the certificate before trusting it. User-installed CAs expand browser/app trust; remove the CA manually when no longer needed. The local TLS test does not prove Android or browser trust.</p>
+    </div>
   </section>
   <md-dialog id="catalog-confirm-dialog">
     <div slot="headline" id="catalog-confirm-title">Confirm change</div>

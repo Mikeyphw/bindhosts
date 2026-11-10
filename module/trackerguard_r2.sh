@@ -215,27 +215,69 @@ tg_r2_manual_restore() {
 # On Android 16 these flags are supported; an error must not replace the last snapshot.
 tg_r2_snapshot() {
   _tg_out=$1
-  _tg_raw=$(mktemp "$TG_STATE_DIR/r2-pm.XXXXXXXX") || return 1
+  _tg_raw=$(mktemp "$TG_STATE_DIR/r2-pm.XXXXXXXX") || {
+    say 'R2_SNAPSHOT_FAILED: private staging unavailable' >&2
+    return 1
+  }
+  # The original error collapsed pm failures, invalid records and sort failures
+  # into one message. Keep those cases fail-closed, but make them diagnosable.
   if ! "$TG_PM" list packages -3 -f --show-versioncode > "$_tg_raw"; then
-    rm -f "$_tg_raw"; return 1
+    # Some OEM / KernelSU environments expose cmd package but not a working pm
+    # wrapper in the root process. Both query the platform PackageManager.
+    if command -v cmd >/dev/null 2>&1; then
+      if ! cmd package list packages -3 -f --show-versioncode > "$_tg_raw"; then
+        rm -f "$_tg_raw"
+        say 'R2_SNAPSHOT_FAILED: both pm and cmd package queries failed' >&2
+        return 1
+      fi
+      say 'R2_SNAPSHOT_PM_FALLBACK: using cmd package' >&2
+    else
+      rm -f "$_tg_raw"
+      say 'R2_SNAPSHOT_FAILED: pm query failed; cmd package unavailable' >&2
+      return 1
+    fi
   fi
-  # A truncated/unparseable package list must not be interpreted as mass uninstall.
+  # Android version and package paths can contain base64 = signs. Select the
+  # LAST '=' before versionCode, never blindly split the APK path on '='.
+  # Ignore blank lines only; refuse unrecognized text or invalid package rows.
+  # Do not expose installed package identifiers in diagnostic output.
   if ! awk '
-    /^package:/ {
-      line=$0; sub(/^package:/,"",line)
-      name=line; sub(/ versionCode:.*/, "", name)
-      sub(/^.*=/,"",name)
-      if (name !~ /^[A-Za-z0-9_.]+$/ || index(name,".")==0 || line !~ / versionCode:[0-9]+$/) {bad=1; next}
-      print name "|" line
+    /^[[:space:]]*$/ {next}
+    {
+      row=$0; sub(/\r$/, "", row)
+      if (substr(row,1,8)!="package:") {bad++; next}
+      if (!match(row,/ versionCode:[0-9]+($|[[:space:]])/)) {bad++; next}
+      before=substr(row,1,RSTART-1)
+      version=substr(row,RSTART+13,RLENGTH-13)
+      sub(/[[:space:]].*$/, "", version)
+      if (version !~ /^[0-9]+$/ || before !~ /^package:.*\.apk=[A-Za-z0-9_.]+$/) {bad++;next}
+      name=before; sub(/^.*=/,"",name)
+      if (seen[name]++) {bad++;next}
+      if (name !~ /^[A-Za-z_][A-Za-z0-9_.]*$/ || index(name,".")==0 || index(name,"..")) {bad++;next}
+      rest=" " substr(row,RSTART+RLENGTH)
+      # Only allow known optional flags following the version. A failure
+      # retains the previous observation snapshot and all IFW rules.
+      if (rest !~ /^([[:space:]]+(stopped=(true|false)|uid:[0-9,]+|installer=[A-Za-z0-9_.]+))*[[:space:]]*$/) {bad++;next}
+      # Preserve the pre-HF02 seen.tsv fingerprint: no package: prefix.
+      print name "|" substr(before,9) " versionCode:" version
       count++
     }
-    END { if (bad || !count) exit 7 }
+    END {
+      if (bad || !count) {
+        printf "R2_SNAPSHOT_PARSE_FAILED: valid=%d invalid=%d (package names redacted)\n", count, bad > "/dev/stderr"
+        exit 7
+      }
+    }
   ' "$_tg_raw" > "$_tg_out"; then
-    rm -f "$_tg_raw"; return 1
+    rm -f "$_tg_raw" "$_tg_out"
+    return 1
   fi
   rm -f "$_tg_raw"
-  LC_ALL=C sort -u "$_tg_out" -o "$_tg_out" || return 1
-  [ -s "$_tg_out" ]
+  if ! LC_ALL=C sort -u "$_tg_out" -o "$_tg_out" || [ ! -s "$_tg_out" ]; then
+    say 'R2_SNAPSHOT_FAILED: normalization or empty inventory' >&2
+    return 1
+  fi
+  return 0
 }
 
 tg_r2_once() {

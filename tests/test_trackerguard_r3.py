@@ -122,6 +122,28 @@ class R3Tests(unittest.TestCase):
             self.assertTrue(any(p[0].startswith('R3_AFTER_UNENROLL_') and p[1] for p in adb.probes))
             self.assertEqual(len(adb.probes),5)
 
+    def test_first_snapshot_failure_has_no_false_cleanup_failure(self):
+        class SnapshotFailureADB(MockADB):
+            def tracker(self, *args):
+                if args == ('monitor', 'once'):
+                    self.calls.append(('tracker', args))
+                    raise r3.Refused('R2_SNAPSHOT_PARSE_FAILED: valid=0 invalid=1')
+                return super().tracker(*args)
+        with tempfile.TemporaryDirectory(dir=os.environ.get('TMPDIR','/tmp')) as t:
+            a,b=self.apk_fixtures(t)
+            adb=SnapshotFailureADB()
+            with mock.patch.object(r3.time,'sleep',return_value=None), \
+                 mock.patch.object(r3,'validate_lab_apk',return_value=None):
+                with self.assertRaisesRegex(r3.Refused,'R2_SNAPSHOT_PARSE_FAILED'):
+                    r3.acceptance(adb,a,b)
+            self.assertFalse(adb.is_installed)
+            self.assertFalse(adb.monitor)
+            self.assertFalse(adb.enrolled)
+            self.assertFalse(adb.auto)
+            self.assertEqual(len([1 for k, args in adb.calls
+                                  if k == 'tracker' and args == ('monitor','once')]),1)
+            self.assertEqual(adb.manual, 'com.existing.app|receiver|com.existing.app.ManualReceiver\n')
+
     def test_baseline_monitor_once_precedes_v2_install(self):
         with tempfile.TemporaryDirectory(dir=os.environ.get('TMPDIR','/tmp')) as t:
             a,b=self.apk_fixtures(t)

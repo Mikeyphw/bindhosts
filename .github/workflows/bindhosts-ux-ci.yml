@@ -9,6 +9,11 @@ on:
       - 'module/hosts_target_safe.sh'
       - 'module/hosts_reset_safe.sh'
       - 'module/response_mode.sh'
+      - 'module/https_response.sh'
+      - 'native/blocked_response_tls/**'
+      - 'tests/test_https_response_ux07.py'
+      - 'tests/test_https_install_permissions.py'
+      - 'tests/test_webui_ux07.py'
       - 'native/blocked_response.c'
       - 'tests/test_hosts_target_ux03.py'
       - 'tests/test_blocked_response_ux04.py'
@@ -74,6 +79,17 @@ jobs:
           sh -n module/config_backup_safe.sh
           python3 tests/test_backup_safe_ux06.py
           python3 tests/test_webui_ux06.py
+      - name: Setup Go for UX07 local TLS validation
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.x'
+          cache: false
+      - name: UX07 TLS and certificate controls
+        run: |
+          sh -n module/https_response.sh
+          python3 tests/test_https_response_ux07.py
+          python3 tests/test_https_install_permissions.py
+          python3 tests/test_webui_ux07.py
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
@@ -108,6 +124,8 @@ jobs:
           test -s module/ux05_diagnostics.sh
           test -s module/hosts_target_safe.sh
           test -s module/response_mode.sh
+          test -s module/https_response.sh
+          test -s native/blocked_response_tls/main.go
           test -s module/hosts_reset_safe.sh
           test -s module/hosts_config_safe.sh
           test -s module/hosts_update_safe.sh

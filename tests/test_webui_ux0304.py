@@ -16,7 +16,7 @@ class UX0304(unittest.TestCase):
   self.assertNotIn('INADDR_ANY',server)
   self.assertIn('image/gif',server)
   self.assertIn('image/svg+xml',server)
-  self.assertIn('https_replacement=unsupported',shell)
+  self.assertIn('https_replacement=conditional_user_ca_trust_required',shell)
  def test_ux04_controls_restricted_and_confirmed(self):
   js=(ROOT/'webui/utils/blocked_response.js').read_text()
   html=(ROOT/'webui/page/catalog/catalog.html').read_text()

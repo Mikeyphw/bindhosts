@@ -43,8 +43,8 @@ class UX02Contract(unittest.TestCase):
         self.assertIn('catalogHtml',router)
         self.assertIn('appsHtml',router)
         version=(ROOT/'module/module.prop').read_text()
-        self.assertIn('version=v2.1.5-tg.0.10',version)
-        self.assertIn('versionCode=21610',version)
+        self.assertIn('version=v2.1.5-tg.0.11',version)
+        self.assertIn('versionCode=21611',version)
 
     def test_ci_runs_new_tests(self):
         workflow=(ROOT/'.github/workflows/bindhosts-ux-ci.yml').read_text()
