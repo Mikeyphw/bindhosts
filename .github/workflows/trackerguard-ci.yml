@@ -32,7 +32,9 @@ jobs:
           python3 tests/test_scanner_install_permissions.py
           python3 tests/test_responder_install_permissions.py
       - name: R2 opt-in observer and automatic IFW reconciliation tests
-        run: python3 tests/test_trackerguard_r2.py
+        run: |
+          python3 tests/test_trackerguard_r2.py
+          python3 tests/test_trackerguard_r2_snapshot_hf02.py
       - name: UX03/UX04 regression tests
         run: |
           python3 tests/test_hosts_target_ux03.py

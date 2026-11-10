@@ -258,7 +258,8 @@ tg_r2_snapshot() {
       # Only allow known optional flags following the version. A failure
       # retains the previous observation snapshot and all IFW rules.
       if (rest !~ /^([[:space:]]+(stopped=(true|false)|uid:[0-9,]+|installer=[A-Za-z0-9_.]+))*[[:space:]]*$/) {bad++;next}
-      print name "|" before " versionCode:" version
+      # Preserve the pre-HF02 seen.tsv fingerprint: no package: prefix.
+      print name "|" substr(before,9) " versionCode:" version
       count++
     }
     END {

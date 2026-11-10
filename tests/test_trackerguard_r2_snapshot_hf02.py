@@ -40,9 +40,18 @@ class SnapshotContract(unittest.TestCase):
     def test_normal_android16_base64_paths(self):
         cp,output=self.exercise(GOOD)
         self.assertEqual(cp.returncode,0,cp.stderr)
-        self.assertIn('com.example.alpha|package:',output)
+        self.assertIn('com.example.alpha|/data/app/',output)
         self.assertIn('versionCode:201',output)
         self.assertEqual(len(output.splitlines()),2)
+
+    def test_fingerprint_matches_previous_seen_tsv_format(self):
+        cp, output = self.exercise(GOOD)
+        self.assertEqual(cp.returncode, 0, cp.stderr)
+        self.assertEqual(output.splitlines(), [
+            'com.example.alpha|/data/app/~~0ABc==/com.example-a1==/base.apk=com.example.alpha versionCode:201',
+            'com.example.beta|/data/app/~~5d9==/com.example-b2==/base.apk=com.example.beta versionCode:0',
+        ])
+        self.assertNotIn('|package:', output)
 
     def test_optional_known_metadata(self):
         cp,output=self.exercise('package:/data/app/~~abc==/base.apk=com.example.alpha versionCode:7 stopped=false uid:12345\n')
