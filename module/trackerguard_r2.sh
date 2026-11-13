@@ -221,21 +221,14 @@ tg_r2_snapshot() {
   }
   # The original error collapsed pm failures, invalid records and sort failures
   # into one message. Keep those cases fail-closed, but make them diagnosable.
-  if ! "$TG_PM" list packages -3 -f --show-versioncode > "$_tg_raw"; then
-    # Some OEM / KernelSU environments expose cmd package but not a working pm
-    # wrapper in the root process. Both query the platform PackageManager.
-    if command -v cmd >/dev/null 2>&1; then
-      if ! cmd package list packages -3 -f --show-versioncode > "$_tg_raw"; then
-        rm -f "$_tg_raw"
-        say 'R2_SNAPSHOT_FAILED: both pm and cmd package queries failed' >&2
-        return 1
-      fi
-      say 'R2_SNAPSHOT_PM_FALLBACK: using cmd package' >&2
-    else
-      rm -f "$_tg_raw"
-      say 'R2_SNAPSHOT_FAILED: pm query failed; cmd package unavailable' >&2
-      return 1
-    fi
+  # HF04: compare platform pm and cmd in the same root shell, with stdin
+  # detached from Termux/ADB PTYs. Retry bounded transport failures only.
+  # The independent parser below still refuses malformed or empty inventories.
+  if ! TG_PM="$TG_PM" TG_STATE_DIR="$TG_STATE_DIR" \
+      sh "$TG_R1_MODDIR/trackerguard_r2_pm_query.sh" "$_tg_raw"; then
+    rm -f "$_tg_raw"
+    say 'R2_SNAPSHOT_FAILED: PackageManager transport unavailable; state retained' >&2
+    return 1
   fi
   # Android version and package paths can contain base64 = signs. Select the
   # LAST '=' before versionCode, never blindly split the APK path on '='.
