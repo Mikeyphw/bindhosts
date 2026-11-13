@@ -3,6 +3,7 @@
 import os
 from pathlib import Path
 import subprocess
+import shutil
 import tempfile
 import unittest
 
@@ -25,6 +26,7 @@ class SnapshotContract(unittest.TestCase):
             raw.write_text(text)
             p.write_text('#!/bin/sh\ncat "$TG_RAW"\nexit '+str(pm_rc)+'\n');p.chmod(0o755)
             mockbin=root/'bin';mockbin.mkdir()
+            shutil.copy2(ROOT/'module/trackerguard_r2_pm_query.sh', root/'trackerguard_r2_pm_query.sh')
             if cmd_output is not None:
                 b=mockbin/'cmd';b.write_text('#!/bin/sh\n[ "$1" = package ] || exit 13\ncat "$TG_CMD_RAW"\n');b.chmod(0o755)
                 (root/'cmdraw').write_text(cmd_output)
@@ -33,6 +35,7 @@ class SnapshotContract(unittest.TestCase):
                 b=mockbin/'cmd';b.write_text('#!/bin/sh\nexit 13\n');b.chmod(0o755)
             sh=root/'test.sh';sh.write_text('say() { echo "$*"; }\n'+function_body()+'\ntg_r2_snapshot "$TG_STATE_DIR/snapshot"\n')
             env=dict(os.environ,TG_PM=str(p),TG_RAW=str(raw),TG_STATE_DIR=str(root),
+                     TG_R1_MODDIR=str(root),TG_CMD_BIN=str(b),
                      TG_CMD_RAW=str(root/'cmdraw'),PATH=str(mockbin)+':'+os.environ.get('PATH','/usr/bin:/bin'))
             cp=subprocess.run(['sh',str(sh)],env=env,capture_output=True,text=True,timeout=12)
             return cp, (root/'snapshot').read_text() if (root/'snapshot').exists() else ''
@@ -68,7 +71,7 @@ class SnapshotContract(unittest.TestCase):
     def test_reject_empty_inventory_no_mass_uninstall(self):
         cp,output=self.exercise('')
         self.assertNotEqual(cp.returncode,0)
-        self.assertIn('valid=0 invalid=0',cp.stderr)
+        self.assertIn('R2_PM_QUERY_FAILED: attempts=3',cp.stderr)
         self.assertEqual(output,'')
 
     def test_reject_invalid_version_and_package(self):
@@ -90,7 +93,7 @@ class SnapshotContract(unittest.TestCase):
     def test_both_package_managers_failed(self):
         cp,output=self.exercise('',pm_rc=3)
         self.assertNotEqual(cp.returncode,0)
-        self.assertIn('R2_SNAPSHOT_FAILED: both pm and cmd package queries failed',cp.stderr)
+        self.assertIn('R2_PM_QUERY_FAILED: attempts=3',cp.stderr)
         self.assertEqual(output,'')
 
 if __name__=='__main__':unittest.main(verbosity=2)

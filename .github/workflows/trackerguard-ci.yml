@@ -16,6 +16,7 @@ jobs:
           sh -n module/trackerguard.sh
           sh -n module/trackerguard_r1.sh
           sh -n module/trackerguard_r2.sh
+          sh -n module/trackerguard_r2_pm_query.sh
           sh -n module/bindhosts.sh
           sh -n module/service.sh
           bash -n module/customize.sh
@@ -37,6 +38,7 @@ jobs:
         run: |
           python3 tests/test_trackerguard_r2.py
           python3 tests/test_trackerguard_r2_snapshot_hf02.py
+          python3 tests/test_trackerguard_r2_pm_hf04.py
       - name: UX03/UX04 regression tests
         run: |
           python3 tests/test_hosts_target_ux03.py
