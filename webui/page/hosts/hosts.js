@@ -1,7 +1,8 @@
 import { escapeHtml } from '../../utils/safe_text.js';
 import { secureAdd, secureRemove, secureToggle, secureReplaceLine, secureDeleteCustom,
          secureRenameCustom, secureImportCustom, secureFileSize, secureSaveFile } from '../../utils/hosts_secure_io.js';
-import { exec, spawn } from 'kernelsu-alt';
+import { exec } from 'kernelsu-alt';
+import { mountHostsControls, refreshHostsControls } from '../../utils/hosts_controls.js';
 import { showPrompt, basePath, moduleDirectory, filePaths, fetchText, updateUIVisibility } from '../../utils/util.js';
 import { getString } from '../../utils/language.js';
 import { Compartment, EditorState } from '@codemirror/state';
@@ -409,64 +410,6 @@ function attachAddButtonListeners() {
     });
 }
 
-let actionRunning = false, isTerminalOpen = false;
-
-/**
- * Run bindhosts.sh with and display output in fake terminal
- * @param {String} args - argument for bindhosts.sh
- * @returns {Promise<void>}
- */
-function runBindhosts(args) {
-    const terminal = document.getElementById('action-terminal');
-    const terminalContent = document.getElementById('action-terminal-content');
-    const backButton = document.querySelector('.back-button');
-    const FabContainer = document.querySelector('.action-container');
-    const closeBtn = document.getElementById('close-terminal');
-
-    closeBtn.onclick = () => closeTerminal();
-    backButton.onclick = () => closeTerminal();
-
-    if (!actionRunning) {
-        actionRunning = true;
-        terminalContent.innerHTML = '';
-        const output = spawn("sh", [`${moduleDirectory}/bindhosts.sh`, `${args}`]);
-        output.stdout.on('data', (data) => appendOutput(data));
-        output.stderr.on('data', (data) => appendOutput(data));
-        output.on('exit', () => {
-            if (isTerminalOpen) {
-                closeBtn.classList.add('show');
-                FabContainer.classList.add('show');
-            }
-            actionRunning = false;
-        });
-    }
-
-    // Append output to terminal
-    const appendOutput = (output) => {
-        const p = document.createElement('p');
-        p.className = 'action-terminal-output';
-        p.textContent = output;
-        terminalContent.appendChild(p);
-        terminal.scrollTo({ top: terminal.scrollHeight, behavior: 'smooth' });
-    };
-
-    const closeTerminal = () => {
-        if (!isTerminalOpen) return;
-        terminal.close();
-        setTimeout(() => {
-            isTerminalOpen = false;
-        }, 100);
-    }
-
-    // Open output terminal
-    setTimeout(() => {
-        isTerminalOpen = true;
-        terminal.open();
-        closeBtn.classList.remove('show');
-        backButton.onclick = () => closeTerminal();
-    }, 50);
-}
-
 /**
  * Find out custom hosts list and display it
  * @returns {void}
@@ -771,19 +714,16 @@ export function mount() {
     setupRenameDialog();
     if (import.meta.env.DEV) setupDevEditor();
 
-    // Event listeners for action buttons
-    const actionBtn = document.getElementById("action-btn");
-    const forceUpdateButton = document.getElementById('force-update-btn');
+    // Explicit pause/resume/update; never call the legacy checksum-driven toggle.
+    mountHostsControls();
     const importBtn = document.getElementById("import-custom-button");
-
-    actionBtn.onclick = () => runBindhosts("--action");
-    forceUpdateButton.onclick = () => runBindhosts("--force-update");
     importBtn.onclick = () => importCustomHost();
 }
 
 // Lifecycle: Each time page becomes visible
 export function onShow() {
     updateUIVisibility();
+    void refreshHostsControls();
     ["custom", "sources", "blacklist", "whitelist", "sources_whitelist"].forEach(loadFile);
     getCustomHostsList();
 }

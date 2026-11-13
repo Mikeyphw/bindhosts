@@ -63,6 +63,8 @@ jobs:
         run: |
           sh -n module/hosts_target_safe.sh
           sh -n module/hosts_reset_safe.sh
+          sh -n module/hosts_control_safe.sh
+          python3 tests/test_hosts_controls_ux08.py
           sh -n module/response_mode.sh
           sh -n tests/hosts-mount-acceptance.sh
           python3 tests/test_hosts_target_ux03.py

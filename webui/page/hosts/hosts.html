@@ -1,4 +1,23 @@
 <div class="body-content constant-height">
+    <div class="box translucent hosts-control-panel" id="hosts-controls-panel">
+        <div class="hosts-control-heading">
+            <h2>Blocking controls</h2>
+            <md-text-button id="hosts-control-refresh" aria-label="Refresh blocking status">Refresh status</md-text-button>
+        </div>
+        <p id="hosts-control-status" class="hosts-control-status" role="status" aria-live="polite">Checking blocking status…</p>
+        <p id="hosts-control-detail" class="hosts-control-detail">Read the actual hosts configuration before making changes.</p>
+        <div class="hosts-control-actions">
+            <md-filled-button id="hosts-control-toggle" disabled aria-label="Pause blocking">
+                <md-icon slot="icon" id="hosts-control-toggle-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M240-760h160v560H240zm320 0h160v560H560z"/></svg></md-icon>
+                <span id="hosts-control-toggle-label">Pause blocking</span>
+            </md-filled-button>
+            <md-outlined-button id="hosts-control-update" disabled aria-label="Update hosts">
+                <md-icon slot="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M480-160q-133 0-226.5-93.5T160-480h80q0 100 70 170t170 70q100 0 170-70t70-170h80q0 133-93.5 226.5T480-160Zm0-560q-100 0-170 70t-70 170h-80q0-133 93.5-226.5T480-800q133 0 226.5 93.5T800-480h-80q0-100-70-170t-170-70Z"/></svg></md-icon>
+                Update hosts
+            </md-outlined-button>
+        </div>
+    </div>
+
     <!-- Source box -->
     <div class="box translucent">
         <div class="box-header">
