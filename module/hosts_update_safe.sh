@@ -22,6 +22,9 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 mkdir "$LOCK" 2>/dev/null || fail 'another hosts update is running'
 LOCKED=1
+# Shared with the explicit pause/resume controller. Refuse even cron updates
+# while paused; otherwise a scheduled update would silently resume blocking.
+[ ! -e "$ROOT/bindhosts_backup" ] && [ ! -L "$ROOT/bindhosts_backup" ] || fail 'blocking paused; resume before updating'
 STAGE=$(mktemp -d "$ROOT/.hosts-update.XXXXXXXX") || fail 'cannot create staging directory'
 chmod 0700 "$STAGE"
 

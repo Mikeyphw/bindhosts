@@ -1,0 +1,15 @@
+/* UX08: two clearly named, distinct actions; no ambiguous play FABs. */
+.hosts-control-panel { width: 100%; box-sizing: border-box; }
+.hosts-control-heading { display: flex; gap: 12px; align-items: center; justify-content: space-between; }
+.hosts-control-heading h2 { margin: 0; }
+.hosts-control-status { margin: 12px 0 5px; font-weight: 650; }
+.hosts-control-status[data-state="ACTIVE"] { color: var(--md-sys-color-primary); }
+.hosts-control-status[data-state="PAUSED"] { color: var(--md-sys-color-error); }
+.hosts-control-detail { margin: 0 0 12px; font-size: .87rem; line-height: 1.4; color: var(--md-sys-color-on-surface-variant); }
+.hosts-control-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.hosts-control-actions md-filled-button, .hosts-control-actions md-outlined-button { min-height: 44px; }
+#hosts-control-toggle { --md-filled-button-container-color: var(--md-sys-color-error-container); --md-filled-button-label-text-color: var(--md-sys-color-on-error-container); --md-filled-button-icon-color: var(--md-sys-color-on-error-container); }
+#hosts-control-toggle.hosts-control-resume { --md-filled-button-container-color: var(--md-sys-color-primary-container); --md-filled-button-label-text-color: var(--md-sys-color-on-primary-container); --md-filled-button-icon-color: var(--md-sys-color-on-primary-container); }
+#hosts-control-update { --md-outlined-button-outline-color: var(--md-sys-color-outline); }
+.hosts-control-actions md-icon { width: 20px; height: 20px; }
+#hosts-control-refresh { white-space: nowrap; }

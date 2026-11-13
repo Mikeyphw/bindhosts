@@ -20,6 +20,8 @@ jobs:
           sh -n module/service.sh
           bash -n module/customize.sh
           sh -n module/hosts_target_safe.sh
+          sh -n module/hosts_control_safe.sh
+          python3 tests/test_hosts_controls_ux08.py
           sh -n module/response_mode.sh
           sh -n module/hosts_reset_safe.sh
           sh -n module/uninstall.sh

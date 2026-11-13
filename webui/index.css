@@ -9,6 +9,7 @@
 @import "./page/apps/apps.css";
 @import "./page/activity/activity.css";
 @import "./page/hosts/hosts.css";
+@import "./utils/hosts_controls.css";
 @import "./page/more/more.css";
 @import "./utils/backup_safe.css";
 

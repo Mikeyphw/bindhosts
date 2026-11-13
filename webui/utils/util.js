@@ -260,13 +260,9 @@ const scrollThreshold = 25;
  */
 export const PAGE_CONFIG = {
     'page-hosts': {
-        container: '.action-container',
-        main: ['#action-btn', '#force-update-btn'],
+        container: null,
+        main: [],
         terminals: {
-            'action-terminal': {
-                buttons: ['#close-terminal'],
-                title: 'global_action'
-            },
             'edit-content': {
                 buttons: ['#line-wrap-btn', '#save-btn'],
                 title: ''

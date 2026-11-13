@@ -43,21 +43,18 @@ if [ -z "$WEBUI_QUIET" ]; then
 	echo "[%] mode: $operating_mode | rwdir: $rwdir "
 fi
 
+# Machine-readable controls must report disabled rather than silently succeed.
+if [ "${1:-}" = --hosts-control ] && [ -f "$MODDIR/disable" ]; then
+    if [ "${2:-}" = status ]; then printf 'BH_HOSTS_STATE=DISABLED\n'; exit 0; fi
+    echo 'BH_HOSTS_REFUSED: module disabled' >&2
+    exit 1
+fi
 [ -f $MODDIR/disable ] && {
 	echo "[*] not running since module has been disabled"
 	string="description=status: disabled ❌ | $(date)"
         sed -i "s/^description=.*/$string/g" $MODDIR/module.prop
 	return
 }
-
-# just in case user deletes them
-# persistence
-[ ! -d /data/adb/bindhosts ] && mkdir -p $PERSISTENT_DIR
-files="custom.txt blacklist.txt sources.txt whitelist.txt"
-for i in $files ; do
-	# if file doesnt exist, write dummy
-	[ ! -f "$PERSISTENT_DIR/$i" ] && echo "#" > "$PERSISTENT_DIR/$i"
-done
 
 adaway_warn() {
 	pm path org.adaway > /dev/null 2>&1 && echo "[-] 🚨 Current operation mode may not work with AdAway 📛"
@@ -83,6 +80,22 @@ case $operating_mode in
 	9) true ;;
 	*) true ;; # catch invalid modes
 esac
+
+# Explicit UX08 control route. Status must not initialize any state files.
+if [ "${1:-}" = --hosts-control ]; then
+    shift
+    sh "$MODDIR/hosts_control_safe.sh" "${1:-status}" "$target_hostsfile" "$PERSISTENT_DIR" "$MODDIR"
+    exit $?
+fi
+
+# just in case user deletes them
+# persistence
+[ ! -d /data/adb/bindhosts ] && mkdir -p $PERSISTENT_DIR
+files="custom.txt blacklist.txt sources.txt whitelist.txt"
+for i in $files ; do
+	# if file doesnt exist, write dummy
+	[ ! -f "$PERSISTENT_DIR/$i" ] && echo "#" > "$PERSISTENT_DIR/$i"
+done
 
 # check hosts file if writable, if not, warn and exit
 if [ ! -w $target_hostsfile ] ; then
@@ -351,6 +364,11 @@ reset() {
 }
 
 run() {
+    # Honor explicit pause even for scheduled/legacy --force-update commands.
+    if [ -e "$PERSISTENT_DIR/bindhosts_backup" ] || [ -L "$PERSISTENT_DIR/bindhosts_backup" ]; then
+        echo 'BH_HOSTS_REFUSED: blocking paused; resume before updating' >&2
+        return 1
+    fi
     # A failed fetch/validation must never update module status or bindhosts_state.
     adblock || { bh_ux05_receipt hosts update fail HOSTS_UPDATE_FAILED; rm -f "$rwdir/bindhosts_lockfile"; echo '[x] UX02: keeping previous hosts'; exit 1; }
 	# store these as variables
@@ -364,7 +382,7 @@ run() {
 	# ready for reset again
 	(cat $PERSISTENT_DIR/*.txt; date +%F) | busybox crc32 > $PERSISTENT_DIR/bindhosts_state
 	# cleanup
-    rm -f "$rwdir/remote_whitelist" "$rwdir/temphosts" "$rwdir/tempwhitelist" "$PERSISTENT_DIR/bindhosts_backup" > /dev/null 2>&1
+    rm -f "$rwdir/remote_whitelist" "$rwdir/temphosts" "$rwdir/tempwhitelist" > /dev/null 2>&1
     bh_ux05_receipt hosts update ok HOSTS_UPDATE_OK
 }
 
