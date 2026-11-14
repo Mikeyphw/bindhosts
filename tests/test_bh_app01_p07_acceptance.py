@@ -2,6 +2,8 @@
 from pathlib import Path
 import importlib.util
 import json
+import os
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -50,6 +52,73 @@ class P07(unittest.TestCase):
         self.assertIn('androidTestImplementation("androidx.test.espresso:espresso-core:',gradle)
         self.assertNotIn('android.permission.INTERNET',manifest)
         self.assertNotIn('onView(withText("Update"))',code)
+
+    def test_hf01_cold_start_modal_is_deferred_and_not_duplicated(self):
+        activity = (APK/'src/main/java/com/mikeyphw/bindhosts/MainActivity.java').read_text()
+        test = (APK/'src/androidTest/java/com/mikeyphw/bindhosts/P07HostedUiTest.java').read_text()
+        self.assertIn('private void consumeUpdateIntent(Intent intent)', activity)
+        self.assertIn('intent.setAction(null)', activity)
+        self.assertIn('pendingUpdateConfirmation = true', activity)
+        self.assertIn('private void scheduleUpdateConfirmation()', activity)
+        self.assertIn('frame.post(() -> {', activity)
+        self.assertIn('activityResumed = true;', activity)
+        self.assertIn('activityResumed = false;', activity)
+        self.assertIn('updateConfirmationScheduled', activity)
+        self.assertIn('updateConfirmation.setOnDismissListener', activity)
+        self.assertIn('updateConfirmation.dismiss()', activity)
+        self.assertNotIn('intent.setAction(null); // Avoid repeating a prior confirmation after recreation.\n            showConfirmUpdate();',activity)
+        self.assertIn('ActivityScenario.launch(i)',test)
+        self.assertIn('Confirmation action must be consumed once',test)
+        self.assertIn('onView(withText("Cancel")).perform(click())',test)
+
+    def test_hf01_fail_closed_emulator_diagnostics(self):
+        hosted=(ROOT/'scripts/ci/bh_app01_p07_emulator.sh').read_text()
+        self.assertIn('trap collect_failure_evidence EXIT',hosted)
+        self.assertIn('local status=$?',hosted)
+        self.assertIn('exit "$status"',hosted)
+        self.assertIn('emulator-failure-logcat.txt',hosted)
+        self.assertIn('failed-command-exit.txt',hosted)
+        self.assertIn('api36-failure.png',hosted)
+        self.assertIn('androidTest-results/connected',hosted)
+        self.assertIn('if (( status != 0 )); then',hosted)
+        self.assertNotIn('|| true',hosted)
+
+    def test_hf01_emulator_failure_trap_preserves_exit_and_evidence(self):
+        # Execute real Bash control flow against inert fake commands. NO Gradle
+        # or Android device is touched; the stub `gradle` simply exits 17.
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            fake=root/'bin'; fake.mkdir()
+            scripts={
+                'git': '#!/bin/sh\nprintf "'+'a'*40+'\\n"\n',
+                'gradle': '#!/bin/sh\nexit 17\n',
+                'adb': """#!/bin/sh
+case "$1" in
+  devices) printf 'List of devices attached\nemulator-5554 device product:sdk model:generic\n' ;;
+  shell) case "$*" in *ro.build.version.sdk*) printf '36\n';; *ro.product.cpu.abi*) printf 'x86_64\n';; *) exit 9;; esac ;;
+  logcat) printf 'HF01_HOSTED_EMULATOR_DIAGNOSTIC_MARKER\n' ;;
+  exec-out) printf '\\211PNG\\r\\n\\032\\nFAILURE_SCREENSHOT' ;;
+  *) exit 9 ;;
+esac
+""",
+            }
+            for name,body in scripts.items():
+                p=fake/name
+                p.write_text(body)
+                p.chmod(0o755)
+            env={**os.environ, 'GITHUB_ACTIONS':'true', 'RUNNER_OS':'Linux',
+                 'SOURCE_SHA':'a'*40, 'PATH':str(fake)+os.pathsep+os.environ['PATH']}
+            completed=subprocess.run(['bash',str(ROOT/'scripts/ci/bh_app01_p07_emulator.sh')],
+                 cwd=root,env=env,text=True,capture_output=True,timeout=10)
+            evidence=root/'android/companion/p07-evidence'
+            self.assertEqual(completed.returncode,17,completed.stderr)
+            self.assertEqual((evidence/'failed-command-exit.txt').read_text().strip(),'17')
+            self.assertIn('HF01_HOSTED_EMULATOR_DIAGNOSTIC_MARKER',
+                          (evidence/'emulator-failure-logcat.txt').read_text())
+            self.assertTrue((evidence/'api36-failure.png').is_file())
+            self.assertFalse((evidence/'api36-home.png').exists())
+            with self.assertRaises((FileNotFoundError,ValueError)):
+                sign.qualify(evidence,'a'*40)
 
     def test_ci_required_p07_without_easing_release_policy(self):
         p = json.loads((ROOT/'ci/bh-app01-required-workflows.json').read_text())

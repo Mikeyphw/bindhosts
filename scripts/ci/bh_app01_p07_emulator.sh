@@ -23,6 +23,29 @@ out=android/companion/p07-evidence
 mkdir -p "$out"
 printf '%s\n' "$SOURCE_SHA" > "$out/source-commit.txt"
 printf '%s\n' 36 > "$out/emulator-api.txt"
+# Preserve instrumentation diagnostics even when Gradle/Android tests fail.
+# The failure evidence is NEVER accepted by the hosted signoff verifier.
+collect_failure_evidence() {
+  local status=$?
+  trap - EXIT
+  set +e
+  if (( status != 0 )); then
+    printf '%s\n' "$status" > "$out/failed-command-exit.txt"
+    reportdir=android/companion/app/build/outputs/androidTest-results/connected
+    if [[ -d $reportdir ]]; then
+      find "$reportdir" -type f -name '*.xml' -exec cp -- {} "$out"/ \;
+    fi
+    # Bounded logs from the disposable emulator only, not a user device.
+    adb logcat -d -t 1600 -v threadtime \
+      -s AndroidRuntime:E ActivityTaskManager:W ActivityManager:W TestRunner:I \
+      > "$out/emulator-failure-logcat.txt" 2>&1
+    adb exec-out screencap -p > "$out/api36-failure.png" 2>/dev/null
+    if [[ ! -s "$out/api36-failure.png" ]]; then rm -f "$out/api36-failure.png"; fi
+    echo "BH_APP01_P07_HF01_HOSTED_FAILURE_EVIDENCE_CAPTURED exit=$status" >&2
+  fi
+  exit "$status"
+}
+trap collect_failure_evidence EXIT
 # Gradle is forbidden on local devices. This script refuses non-GitHub execution.
 gradle -p android/companion --no-daemon \
   :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug :app:connectedDebugAndroidTest

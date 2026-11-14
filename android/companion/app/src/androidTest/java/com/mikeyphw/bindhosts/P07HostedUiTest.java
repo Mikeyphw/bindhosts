@@ -100,6 +100,13 @@ public final class P07HostedUiTest {
         Intent i = new Intent(InstrumentationRegistry.getInstrumentation().getTargetContext(), MainActivity.class);
         i.setAction(MainActivity.ACTION_CONFIRM_UPDATE);
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(i)) {
+            // Cold-start QS ACTION_CONFIRM_UPDATE must reach RESUMED before
+            // showing the native confirmation; the previous onCreate modal
+            // stalled ActivityScenario at PRE_ON_CREATE in hosted API36.
+            scenario.onActivity(activity -> {
+                assertFalse("Confirmation action must be consumed once", 
+                        MainActivity.ACTION_CONFIRM_UPDATE.equals(activity.getIntent().getAction()));
+            });
             onView(withText("Update Bindhosts rules?")).check(matches(isDisplayed()));
             // Never tap the positive action on a hosted emulator or a real device.
             onView(withText("Cancel")).perform(click());

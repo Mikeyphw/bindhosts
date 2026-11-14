@@ -41,6 +41,12 @@ public final class MainActivity extends Activity {
     private TextView loadStatus;
     private boolean destroyed = false;
     private boolean pageLoadError = false;
+    // A QS launch may arrive during onCreate, before Android reports RESUMED.
+    // Never show a modal dialog synchronously in that lifecycle transition.
+    private boolean activityResumed = false;
+    private boolean pendingUpdateConfirmation = false;
+    private boolean updateConfirmationScheduled = false;
+    private android.app.AlertDialog updateConfirmation;
     private String pickerId;
     private JavaScriptReplyProxy pickerReply;
 
@@ -194,11 +200,35 @@ public final class MainActivity extends Activity {
         setIntent(intent);
         consumeUpdateIntent(intent);
     }
+    @Override protected void onResume() {
+        super.onResume();
+        activityResumed = true;
+        scheduleUpdateConfirmation();
+    }
+    @Override protected void onPause() {
+        activityResumed = false;
+        super.onPause();
+    }
     private void consumeUpdateIntent(Intent intent) {
         if (intent != null && ACTION_CONFIRM_UPDATE.equals(intent.getAction())) {
-            intent.setAction(null); // Avoid repeating a prior confirmation after recreation.
-            showConfirmUpdate();
+            intent.setAction(null); // Consume once: no repeated modal on recreation.
+            pendingUpdateConfirmation = true;
+            scheduleUpdateConfirmation();
         }
+    }
+    private void scheduleUpdateConfirmation() {
+        if (destroyed || !activityResumed || !pendingUpdateConfirmation ||
+                updateConfirmationScheduled || frame == null) return;
+        updateConfirmationScheduled = true;
+        // Post until after onCreate/onResume returns to the main event loop.
+        // Showing AlertDialog inside onCreate blocked ActivityScenario at PRE_ON_CREATE.
+        frame.post(() -> {
+            updateConfirmationScheduled = false;
+            if (destroyed || !activityResumed || !pendingUpdateConfirmation ||
+                    isFinishing() || isDestroyed()) return;
+            pendingUpdateConfirmation = false;
+            showConfirmUpdate();
+        });
     }
 
     private void openTextPicker(String id, JavaScriptReplyProxy reply) {
@@ -277,7 +307,9 @@ public final class MainActivity extends Activity {
     private void showConfirmUpdate() {
         // Update tile opens an explicit native confirmation; backend does not
         // accept concurrent or paused-state updates.
-        new android.app.AlertDialog.Builder(this)
+        if (destroyed || isFinishing() || isDestroyed()) return;
+        if (updateConfirmation != null && updateConfirmation.isShowing()) return;
+        updateConfirmation = new android.app.AlertDialog.Builder(this)
                 .setTitle("Update Bindhosts rules?")
                 .setMessage("Download configured sources and apply only after verification. An existing update cannot be restarted concurrently.")
                 .setNegativeButton("Cancel", (dialog, which) -> {})
@@ -297,7 +329,9 @@ public final class MainActivity extends Activity {
                                 android.widget.Toast.makeText(this, message, android.widget.Toast.LENGTH_LONG).show();
                         });
                     });
-                }).show();
+                }).create();
+        updateConfirmation.setOnDismissListener(dialog -> updateConfirmation = null);
+        updateConfirmation.show();
     }
     @Override public void onBackPressed() {
         if (web == null) { super.onBackPressed(); return; }
@@ -311,6 +345,12 @@ public final class MainActivity extends Activity {
     }
     @Override public void onDestroy() {
         destroyed = true;
+        pendingUpdateConfirmation = false;
+        updateConfirmationScheduled = false;
+        if (updateConfirmation != null) {
+            updateConfirmation.dismiss();
+            updateConfirmation = null;
+        }
         pickerId = null;
         pickerReply = null;
         if (worker != null) worker.shutdownNow();
