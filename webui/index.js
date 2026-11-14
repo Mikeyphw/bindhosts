@@ -1,4 +1,5 @@
 import { initializeLogCatcher } from './utils/log_catcher.js';
+import { mountHostsOperationUI } from './utils/hosts_operations_ux09.js';
 import { checkMMRL, setupSlideMenu, moduleDirectory } from './utils/util.js';
 import { loadTranslations } from './utils/language.js';
 import { closeTopManagedLayer, hasManagedHistoryLayer, registerManagedDialog } from './utils/history.js';
@@ -176,6 +177,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.querySelectorAll('[unresolved]').forEach(el => el.removeAttribute('unresolved'));
     checkMMRL();
     setupSlideMenu();
+    mountHostsOperationUI();
     applyAppearance();
     router.navigate('home');
     setupUserCustomization();

@@ -1,4 +1,5 @@
 import { bindAppearanceControls } from '../../utils/appearance.js';
+import { setupBlockedResponse, refreshBlockedResponse } from '../../utils/blocked_response.js';
 import { mountBackupControls, refreshBackupControls } from '../../utils/backup_safe.js';
 import { router } from '../../route.js';
 import { escapeHtml } from '../../utils/safe_text.js';
@@ -509,16 +510,35 @@ function controlPanelEventlistener(event) {
     });
 }
 
+// UX09: certificate actions retain an explicit modal confirmation in More.
+function ux09ResponseConfirm(title, description) {
+    return new Promise(resolve => {
+        const dialog=document.getElementById('ux09-response-confirm');
+        const text=document.getElementById('ux09-response-confirm-message');
+        const heading=document.getElementById('ux09-response-confirm-title');
+        const yes=document.getElementById('ux09-response-confirm-yes');
+        const no=document.getElementById('ux09-response-confirm-no');
+        if (!dialog || !text || !heading || !yes || !no) { resolve(false); return; }
+        heading.textContent=title; text.textContent=description;
+        const finish=(value)=>{ yes.onclick=null;no.onclick=null;dialog.removeEventListener('closed',closed);dialog.removeEventListener('close',closed);dialog.close();resolve(value); };
+        const closed=()=>finish(false);
+        yes.onclick=()=>finish(true);no.onclick=()=>finish(false);
+        dialog.addEventListener('closed',closed,{once:true});dialog.addEventListener('close',closed,{once:true});dialog.show();
+    });
+}
+
 // Lifecycle: Initial mount to DOM
 export function mount(section) {
     controlPanelEventlistener();
     mountBackupControls(section);
+    setupBlockedResponse(section,ux09ResponseConfirm);
     bindAppearanceControls(document);
     setupDocsMenu();
 }
 
 // Lifecycle: Each time page becomes visible
 export function onShow() {
+    void refreshBlockedResponse(document);
     refreshBackupControls();
     updateUIVisibility();
     checkUpdateStatus();

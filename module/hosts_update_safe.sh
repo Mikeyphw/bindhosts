@@ -22,6 +22,33 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 mkdir "$LOCK" 2>/dev/null || fail 'another hosts update is running'
 LOCKED=1
+# Snapshot the configured source fingerprint BEFORE downloads. Source edits
+# during an update remain visibly pending rather than being falsely marked applied.
+ux09_source_hash=$(sha256sum "$ROOT/sources.txt" 2>/dev/null | awk '{print $1}') || ux09_source_hash=''
+# UX09 progress uses a private, fixed path. No URLs or domains enter the event stream.
+ux09_event() {
+  [ -n "${BH_UX09_EVENTS:-}" ] || return 0
+  [ "$BH_UX09_EVENTS" = "$ROOT/.ux09-operation/events.tsv" ] || return 0
+  [ -f "$BH_UX09_EVENTS" ] && [ ! -L "$BH_UX09_EVENTS" ] || return 0
+  printf '%s|%s\n' "$1" "$2" >> "$BH_UX09_EVENTS" || :
+}
+ux09_applied() {
+  [ ! -L "$ROOT/.sources-applied.sha256" ] || return 0
+  _hash=$ux09_source_hash
+  case "$_hash" in *[!a-f0-9]*|'') return 0 ;; esac
+  [ "${#_hash}" = 64 ] || return 0
+  _tmp=$(mktemp "$ROOT/.ux09-applied.XXXXXXXX") || return 0
+  if printf '%s\n' "$_hash" > "$_tmp" && chmod 0600 "$_tmp" && mv -f "$_tmp" "$ROOT/.sources-applied.sha256"; then
+    [ ! -L "$ROOT/.sources-applied.epoch" ] || return 0
+    _epoch=$(date +%s) || return 0
+    case "$_epoch" in ''|*[!0-9]*) return 0 ;; esac
+    _stamp=$(mktemp "$ROOT/.ux09-epoch.XXXXXXXX") || return 0
+    printf '%s\n' "$_epoch" > "$_stamp" && chmod 0600 "$_stamp" && mv -f "$_stamp" "$ROOT/.sources-applied.epoch" || { rm -f "$_stamp"; :; }
+  else
+    rm -f "$_tmp"
+  fi
+}
+ux09_event PREPARING 'Private staging and configuration verification'
 # Shared with the explicit pause/resume controller. Refuse even cron updates
 # while paused; otherwise a scheduled update would silently resume blocking.
 [ ! -e "$ROOT/bindhosts_backup" ] && [ ! -L "$ROOT/bindhosts_backup" ] || fail 'blocking paused; resume before updating'
@@ -48,6 +75,8 @@ validate_url() {
 }
 # A complete source download is mandatory. A failed or truncated source must not create a partial ruleset.
 source_count=0
+skipped_urls=0
+: > "$STAGE/ux09-seen-urls"
 fetch_sources() {
   _list=$1; _mode=$2; _dest=$3
   [ -f "$_list" ] && [ ! -L "$_list" ] || fail 'source list missing or unsafe'
@@ -56,7 +85,14 @@ fetch_sources() {
     _line=$(printf '%s' "$_line" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
     case "$_line" in ''|disabled\|*) continue ;; esac
     validate_url "$_line"
+    if grep -Fqx -- "$_mode|$_line" "$STAGE/ux09-seen-urls"; then
+      skipped_urls=$((skipped_urls+1))
+      ux09_event SKIPPED_DUPLICATE_URL "Count $skipped_urls"
+      continue
+    fi
+    printf '%s\n' "$_mode|$_line" >> "$STAGE/ux09-seen-urls"
     source_count=$((source_count+1))
+    ux09_event DOWNLOADING "Source $source_count"
     _download="$STAGE/source.$source_count"
     printf '[>] verified HTTPS source %s\n' "$_line"
     fetch "$_line" "$_download" || fail "download failed: $_line"
@@ -64,6 +100,7 @@ fetch_sources() {
     [ "$(wc -c < "$_download")" -le 67108864 ] || fail "source exceeds 64 MiB: $_line"
     awk -v mode="$_mode" -f "$PARSE" "$_download" > "$STAGE/parsed.$source_count" || fail 'invalid downloaded hosts syntax'
     [ -s "$STAGE/parsed.$source_count" ] || fail "no valid hosts/domain entries: $_line"
+    ux09_event PARSED "Source $source_count validated"
     cat "$STAGE/parsed.$source_count" >> "$_dest" || fail 'could not stage source entries'
   done < "$_list"
 }
@@ -87,8 +124,13 @@ for _custom in "$ROOT"/custom*.txt; do
 done
 
 # Exact match only; explicit *.domain includes the base domain and all of its subdomains.
+ux09_event DEDUPLICATING 'Normalizing combined blocklists'
+ux09_raw=$(wc -l < "$STAGE/blocked" | tr -d ' ')
 LC_ALL=C sort -u "$STAGE/blocked" > "$STAGE/block-unique"
 LC_ALL=C sort -u "$STAGE/allowed" > "$STAGE/allow-unique"
+ux09_unique=$(wc -l < "$STAGE/block-unique" | tr -d ' ')
+ux09_dup=$((ux09_raw-ux09_unique))
+ux09_event ALLOWLIST 'Applying exact and wildcard exclusions'
 awk '
   FILENAME==ARGV[1] { allow[$0]=1; next }
   {
@@ -128,13 +170,23 @@ awk '
   printf '# bindhosts-block-end\n'
   printf '# bindhosts v%s\n' "$VERSION"
 } > "$STAGE/candidate" || fail 'could not render candidate'
+ux09_final=$(wc -l < "$STAGE/filtered" | tr -d ' ')
+ux09_excluded=$((ux09_unique-ux09_final))
+ux09_event GENERATING 'Candidate hosts rendered and validated'
 [ -s "$STAGE/candidate" ] && grep -Fq "# bindhosts v$VERSION" "$STAGE/candidate" || fail 'candidate validation failed'
 [ -s "$TARGET" ] || fail 'active hosts unexpectedly empty'
 if cmp -s "$TARGET" "$STAGE/candidate"; then
+  ux09_applied
+  ux09_event STATS "$ux09_raw|$ux09_dup|$ux09_unique|$ux09_excluded|$ux09_final|$source_count|$skipped_urls|0"
+  ux09_event UNCHANGED 'Hosts file already matches verified candidate'
   echo 'BH_UPDATE_UNCHANGED: original already up to date'; exit 0
 fi
 # Journaled mount-aware commit; recovery runs on boot if power is lost during
 # an in-place bind-mounted write. The fallback is NOT power-loss atomic.
+ux09_event COMMITTING 'Journaled writer committing verified candidate'
 BH_HOSTS_ROOT="$ROOT" BH_HOSTS_TEST_MODE="${BH_UPDATE_TEST_MODE:-0}" \
   sh "$MODDIR/hosts_target_safe.sh" commit "$TARGET" "$STAGE/candidate" || fail 'journaled hosts commit failed'
+ux09_applied
+ux09_event STATS "$ux09_raw|$ux09_dup|$ux09_unique|$ux09_excluded|$ux09_final|$source_count|$skipped_urls|1"
+ux09_event DONE 'Hosts candidate committed and verified'
 echo 'BH_UPDATE_SAFE_PASS: candidate committed and verified'

@@ -5,7 +5,7 @@ import unittest
 R=Path(__file__).resolve().parents[1]
 class Contract(unittest.TestCase):
  def test_ui_controls(self):
-  s=(R/'webui/page/catalog/catalog.html').read_text()
+  s=(R/'webui/page/more/more.html').read_text()
   for x in ('https-cert-create','https-cert-export','https-response-enable','https-response-disable','https-response-test','https-certificate-settings','not</strong> uninstall','SHA-256'):
    self.assertIn(x,s)
   j=(R/'webui/utils/blocked_response.js').read_text()

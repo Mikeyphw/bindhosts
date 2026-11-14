@@ -1,6 +1,7 @@
 // UX08: explicit hosts controls. Never infer success from an icon tap or stdout alone.
 import { exec } from 'kernelsu-alt';
 import { moduleDirectory, showPrompt } from './util.js';
+import { beginHostsUpdate } from './hosts_operations_ux09.js';
 
 const VALID = new Set(['ACTIVE', 'PAUSED', 'INACTIVE', 'DISABLED']);
 const WAITING = 'Checking blocking status…';
@@ -42,7 +43,8 @@ function applyState(state, message = '') {
     const current = names[state] || names.UNKNOWN;
     el.state.textContent = busy ? 'Working…' : current[0];
     el.detail.textContent = message || current[1];
-    el.state.dataset.state = state;
+    el.state.dataset.state = busy ? 'WORKING' : state;
+    el.state.setAttribute('aria-busy', String(busy));
     el.toggleLabel.textContent = state === 'PAUSED' ? 'Resume blocking' : 'Pause blocking';
     el.toggle.setAttribute('aria-label', el.toggleLabel.textContent);
     const glyph = el.toggleIcon?.querySelector('path');
@@ -78,7 +80,7 @@ async function perform(action) {
     ++token;
     busy = true;
     const initial = latest;
-    applyState(initial || 'UNKNOWN', 'Applying requested change…');
+    applyState(initial || 'UNKNOWN', action === 'pause' ? 'Saving reversible hosts backup…' : action === 'resume' ? 'Restoring verified hosts backup…' : 'Preparing hosts update…');
     try {
         const before = await command('status');
         const oldState = before.match(/^BH_HOSTS_STATE=(ACTIVE|PAUSED|INACTIVE|DISABLED)$/m)?.[1];
@@ -94,7 +96,7 @@ async function perform(action) {
         const expected = action === 'pause' ? 'PAUSED' : 'ACTIVE';
         if (confirmed !== expected) throw new Error('Read-back did not confirm the requested state');
         latest = confirmed;
-        showPrompt(action === 'pause' ? 'Hosts blocking paused.' : action === 'resume' ? 'Hosts blocking resumed.' : 'Hosts update completed.');
+        showPrompt(action === 'pause' ? 'Blocking paused — reversible backup verified.' : action === 'resume' ? 'Blocking resumed — original hosts restored.' : 'Hosts update completed.');
     } catch (error) {
         latest = 'UNKNOWN';
         showPrompt(`Hosts action not verified: ${error.message}`, false);
@@ -110,7 +112,7 @@ export function mountHostsControls() {
     const el = elements();
     if (!el.toggle || !el.update || !el.refresh) return;
     el.toggle.addEventListener('click', () => perform(latest === 'PAUSED' ? 'resume' : 'pause'));
-    el.update.addEventListener('click', () => perform('update'));
+    el.update.addEventListener('click', () => { void beginHostsUpdate().catch(err => showPrompt(`Update refused: ${err.message}`, false, 5500)); });
     el.refresh.addEventListener('click', () => refreshHostsControls());
     applyState('UNKNOWN');
 }

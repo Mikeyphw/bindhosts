@@ -13,3 +13,8 @@
 #hosts-control-update { --md-outlined-button-outline-color: var(--md-sys-color-outline); }
 .hosts-control-actions md-icon { width: 20px; height: 20px; }
 #hosts-control-refresh { white-space: nowrap; }
+
+/* UX09 verification feedback: only indicate activity while a confirmed command is running. */
+#hosts-control-status[data-state="WORKING"]{color:var(--md-sys-color-tertiary)}
+#hosts-control-status[data-state="WORKING"]::before{content:"";display:inline-block;width:12px;height:12px;border:2px solid var(--md-sys-color-outline);border-top-color:var(--md-sys-color-tertiary);border-radius:100%;animation:ux09spin .8s linear infinite;margin-right:8px;vertical-align:-2px}
+@keyframes ux09spin{to{transform:rotate(360deg)}}
