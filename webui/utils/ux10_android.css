@@ -1,0 +1,51 @@
+/* UX10 Android-only KernelSU WebUI; safe areas + touch targets. No desktop layout. */
+.ux10-sources-heading {display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+#ux10-manage-presets {min-height:44px;margin-inline-start:auto;padding:9px 14px;border-radius:13px;border:1px solid var(--md-sys-color-outline-variant);color:var(--md-sys-color-on-surface);background:var(--md-sys-color-surface-container);font:inherit;cursor:pointer;}
+.ux10-source-back {position:sticky;top:0;z-index:5;display:flex;align-items:center;min-height:46px;width:max-content;max-width:100%;gap:8px;padding:8px 14px;border-radius:13px;border:1px solid var(--md-sys-color-outline-variant);background:var(--md-sys-color-surface-container-high);color:var(--md-sys-color-on-surface);font:inherit;font-weight:600;margin:0 0 15px;}
+#page-catalog .ux-content {padding-bottom:calc(var(--bottom-inset) + 85px);}
+#page-catalog .ux09-catalog-actions button {min-height:44px;}
+#page-catalog .ux09-preset {min-height:70px;}
+#page-catalog .ux09-preset input[type=checkbox] {min-width:24px;min-height:24px;}
+/* Direct, state-driven confirmation: tapping either button hides immediately. */
+#ux09-operation-confirm[hidden] {display:none!important;}
+#ux09-operation-confirm.ux10-confirm-backdrop {position:fixed;inset:0;z-index:12000;display:flex;align-items:center;justify-content:center;padding:calc(var(--top-inset) + 16px) 16px calc(var(--bottom-inset) + 16px);background:#000b;box-sizing:border-box;}
+.ux10-confirm-card {width:100%;max-width:400px;box-sizing:border-box;border-radius:20px;background:var(--md-sys-color-surface-container-high);color:var(--md-sys-color-on-surface);border:1px solid var(--md-sys-color-outline-variant);box-shadow:0 16px 48px #0006;padding:22px;}
+.ux10-confirm-card h2 {font-size:1.2rem;line-height:1.35;margin:0 0 10px;}
+.ux10-confirm-card p {font-size:.93rem;line-height:1.55;margin:0 0 20px;}
+.ux10-confirm-actions {display:flex;justify-content:flex-end;gap:9px;}
+.ux10-confirm-actions button {min-width:105px;min-height:48px;border-radius:13px;padding:9px 14px;border:1px solid var(--md-sys-color-outline);background:var(--md-sys-color-surface-container);color:var(--md-sys-color-on-surface);font:inherit;font-weight:600;}
+#ux09-operation-confirm-yes {background:var(--md-sys-color-primary);color:var(--md-sys-color-on-primary);border-color:transparent;}
+#ux09-operation-overlay {padding:calc(var(--top-inset) + 14px) 14px calc(var(--bottom-inset) + 16px);}
+#ux09-operation-overlay .ux09-op-actions button {min-height:46px;}
+#ux10-operation-source {font-size:.84rem;line-height:1.5;border-radius:12px;margin:0;padding:12px;background:var(--md-sys-color-surface-container);color:var(--md-sys-color-on-surface);overflow-wrap:anywhere;}
+.ux10-terminal-label {font-size:.7rem;font-weight:650;letter-spacing:.08em;text-transform:uppercase;color:var(--md-sys-color-on-surface-variant);}
+#ux09-operation-lines {font-size:.8rem;line-height:1.7;overscroll-behavior:contain;}
+/* Four bottom tabs on narrow portrait displays. */
+.bottom-bar .bottom-bar-item {min-width:0;}
+@media(max-width:520px) {
+  #page-catalog .ux09-catalog-actions {display:grid;grid-template-columns:1fr;}
+  #page-catalog .ux09-catalog-actions button {width:100%;}
+  .ux09-op-header {flex-wrap:nowrap;}
+  .ux09-op-header h2 {font-size:1rem;}
+  .ux10-confirm-card {padding:19px;}
+}
+
+/* UX10 HF01: real mobile-sized preset radio cards and deliberate selected state. */
+#page-catalog .ux10-selectable-row,#page-catalog .ux10-energized-none{cursor:pointer;touch-action:manipulation;min-height:60px;}
+#page-catalog .ux10-selectable-row:focus-within,#page-catalog .ux10-energized-none:focus-within{outline:2px solid var(--md-sys-color-primary);outline-offset:2px;}
+#page-catalog input[name="ux10-energized"]{width:26px;height:26px;min-width:26px;flex-shrink:0;accent-color:var(--md-sys-color-primary);}
+#page-catalog .ux10-energized-none{background:var(--md-sys-color-surface-container-low);}
+#ux10-operation-source{border-inline-start:3px solid var(--md-sys-color-primary);}
+#ux10-operation-source[data-state="Failed"]{border-inline-start-color:var(--md-sys-color-error);}
+#page-catalog .ux09-catalog-summary{border:1px solid var(--md-sys-color-outline-variant);}
+@media(max-width:390px){
+ #page-catalog .ux09-preset{gap:8px;}
+ #page-catalog .ux09-choice-copy{min-width:0;}
+ .ux10-confirm-actions button{min-width:0;flex:1;}
+}
+/* Small Android WebViews: do not force the terminal title and action buttons onto one clipped row. */
+@media(max-width:390px){
+ .ux09-op-header{flex-wrap:wrap;}
+ .ux09-op-actions{width:100%;justify-content:flex-end;}
+ .ux09-op-actions button{flex:1;}
+}

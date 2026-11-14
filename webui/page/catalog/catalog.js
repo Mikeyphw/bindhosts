@@ -10,6 +10,15 @@ let view;
 let states = new Map(), selected = new Set();
 let original = new Set(), busy = false, applied = 'UNKNOWN', lastApplied = null;
 const IDS = new Set(presets.map(p => p.id));
+const ENERGIZED = presets.filter(p => p.group === 'energized');
+export function hasPendingSourceChanges() { return busy || dirty(); }
+export async function approveSourceExit() {
+  if (busy) { showPrompt('Finish the current source operation before leaving.', false, 4500); return false; }
+  if (!dirty()) return true;
+  const approved=await confirmHostsAction('Discard unsaved presets?', 'Your preset selections have not been saved. Leave without applying these changes?');
+  if(approved){selected=new Set(original);render();}
+  return approved;
+}
 const ROOT = `sh ${moduleDirectory}/source_catalog.sh`;
 const BATCH = `sh ${moduleDirectory}/source_catalog_batch_ux09.sh`;
 function el(tag, className, content) {
@@ -29,21 +38,40 @@ function makeChoice(p) {
   const info = el('div', 'ux09-choice-copy');
   info.append(el('strong', '', p.name),el('small', '', p.level),el('p', '', p.description));
   const link = el('a', 'catalog-url', 'Publisher URL'); link.href=p.url; link.target='_blank';link.rel='noopener noreferrer';info.append(link);
-  const checkbox = el('input'); checkbox.type='checkbox'; checkbox.checked=selected.has(p.id); checkbox.disabled=busy || state==='external';
+  const checkbox = el('input'); checkbox.type=p.group==='energized' ? 'radio' : 'checkbox'; if(p.group==='energized')checkbox.name='ux10-energized'; checkbox.checked=selected.has(p.id); checkbox.disabled=busy || state==='external';
   checkbox.setAttribute('aria-label',`Enable ${p.name}`);
   checkbox.onchange=()=>{
-    if (p.group==='energized' && checkbox.checked) for (const q of presets.filter(x=>x.group==='energized')) selected.delete(q.id);
+    if (p.group==='energized' && checkbox.checked) for (const q of ENERGIZED) selected.delete(q.id);
     if (checkbox.checked) selected.add(p.id); else selected.delete(p.id);
     render();
   };
   line.append(info,checkbox);
+  line.classList.add('ux10-selectable-row');
+  line.addEventListener('click', e => {
+    if(checkbox.disabled || e.target.closest('a,input,button'))return;
+    checkbox.click();
+  });
   if (state==='external') line.append(el('small','ux09-foreign','Managed manually in Rules'));
   return line;
 }
 function render() {
   if (!view) return;
   const groups = [['core','ux09-core'],['comprehensive','ux09-comprehensive'],['energized','ux09-energized']];
-  for (const [group,id] of groups) view.querySelector(`#${id}`)?.replaceChildren(...presets.filter(x=>x.group===group).map(makeChoice));
+  for (const [group,id] of groups) {
+    const entries=presets.filter(p=>p.group===group).map(makeChoice);
+    if(group==='energized') {
+      const none=el('div','ux-card ux09-preset ux10-energized-none');
+      const info=el('span','ux09-choice-copy','None — disable all Energized tiers');
+      const choice=el('input');choice.type='radio';choice.name='ux10-energized';
+      choice.checked=!ENERGIZED.some(p=>selected.has(p.id));choice.disabled=busy;
+      choice.setAttribute('aria-label','No Energized tier');
+      choice.onchange=()=>{if(!choice.checked)return;for(const p of ENERGIZED)selected.delete(p.id);render();};
+      none.append(info,choice);
+      none.addEventListener('click',e=>{if(e.target!==choice&&!choice.disabled)choice.click();});
+      entries.unshift(none);
+    }
+    view.querySelector(`#${id}`)?.replaceChildren(...entries);
+  }
   const changes = dirty();
   const outstanding = [...states.values()].filter(s=>s==='on').length;
   const stamp=lastApplied ? ` · Last validated ${new Date(lastApplied*1000).toLocaleString()}` : '';
@@ -103,6 +131,7 @@ async function showManual() {
       const action=el('button','ux-secondary-button',state==='on'?'Disable':'Enable');
       action.onclick=async()=>{
         if(busy)return;
+        if(dirty()){showPrompt('Save or discard preset changes before editing manual sources.',false,5000);return;}
         busy=true;action.disabled=true;
         try{await secureToggle('sources',line);await showManual();await refresh();showPrompt('Subscription saved; hosts update required.');}
         catch(err){showPrompt(`Subscription change refused: ${err.message}`,false,5500);}
@@ -124,14 +153,15 @@ function setTab(name) {
 function mount(section) {
   view=section;
   for(const t of ['presets','mine','advanced'])view.querySelector(`#ux09-tab-${t}`)?.addEventListener('click',()=>setTab(t));
+  view.querySelector('#ux10-sources-back').onclick=()=>router.navigate('hosts');
   view.querySelector('#catalog-save').onclick=()=>void apply(false);
   view.querySelector('#catalog-update').onclick=()=>void apply(true);
   view.querySelector('#catalog-view-log').onclick=()=>showHostsOperation();
   view.querySelector('#ux09-open-rules').onclick=()=>router.navigate('hosts');
   view.querySelector('#ux09-open-more').onclick=()=>router.navigate('more');
-  document.addEventListener('ux09-hosts-operation-finished',()=>void refresh().catch(()=>{}));
+  document.addEventListener('ux09-hosts-operation-finished',()=>{if(!dirty())void refresh().catch(()=>{});});
   setTab('presets');
 }
-function onShow() {if(!view)return;void refresh().catch(err=>{setStatus(`Cannot verify sources: ${err.message}`);showPrompt(err.message,false,4500);});}
+function onShow() {if(!view)return;if(dirty()){render();return;}void refresh().catch(err=>{setStatus(`Cannot verify sources: ${err.message}`);showPrompt(err.message,false,4500);});}
 function onHide() {}
 export {mount,onShow,onHide};

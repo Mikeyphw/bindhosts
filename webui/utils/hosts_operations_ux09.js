@@ -7,7 +7,7 @@ const STATUS = new Set(['IDLE', 'RUNNING', 'DONE', 'FAILED', 'INTERRUPTED']);
 const STEPS = {
   PREPARING: 'Preparing hosts update',
   DOWNLOADING: 'Downloading sources',
-  PARSED: 'Validating downloaded entries',
+  PARSED: 'Source validated',
   SKIPPED_DUPLICATE_URL: 'Skipping repeated source URL',
   DEDUPLICATING: 'Removing duplicate domains',
   ALLOWLIST: 'Applying allowlist exclusions',
@@ -40,12 +40,22 @@ function renderEvents(rows) {
   if (!display) return;
   const formatted = rows.map(row => {
     const [tag, ...rest] = row.split('|');
-    return `[${tag}] ${rest.join(' · ')}`;
+    return `${STEPS[tag] || tag} · ${rest.join(' · ')}`;
   });
   display.textContent = formatted.join('\n') || 'Waiting for backend progress events…';
   if (rows.length !== lastLineCount && visible) display.scrollTop = display.scrollHeight;
   lastLineCount = rows.length;
   const statsRow = [...rows].reverse().find(line => line.startsWith('STATS|'));
+  const source = byId('ux10-operation-source');
+  const lastSourceEvent=[...rows].reverse().find(row =>
+    /^(DOWNLOADING|PARSED|FAILED)\|Source \d+ /.test(row));
+  const attempted=rows.filter(row => row.startsWith('DOWNLOADING|')).length;
+  if(source) {
+    const [kind,...detail]=lastSourceEvent?.split('|') || [];
+    const state=kind==='DOWNLOADING' ? 'Downloading' : kind==='PARSED' ? 'Validated' : kind==='FAILED' ? 'Failed' : 'Waiting';
+    source.dataset.state=state;
+    source.textContent=detail.length ? `${state} · ${detail.join(' · ')} · ${attempted} source(s) started` : 'Waiting for source downloads';
+  }
   const summary = byId('ux09-operation-summary');
   if (summary && statsRow) {
     const parts = statsRow.split('|').slice(1);
@@ -95,31 +105,36 @@ function watch() {
 export function showHostsOperation() {
   const panel = byId('ux09-operation-overlay');
   if (!panel) return;
-  panel.hidden = false; visible = true;
+  panel.hidden = false; visible = true; // hide does not cancel root worker
   watch();
 }
 let asking = false;
 export function confirmHostsAction(title, description) {
   if (asking) return Promise.resolve(false);
-  const dialog=byId('ux09-operation-confirm');
-  const heading=byId('ux09-operation-confirm-title');
-  const content=byId('ux09-operation-confirm-message');
-  const yes=byId('ux09-operation-confirm-yes');
-  const no=byId('ux09-operation-confirm-no');
-  if (!dialog || !heading || !content || !yes || !no) return Promise.resolve(false);
-  asking=true; heading.textContent=title; content.textContent=description;
-  return new Promise(resolve=>{
-    let done=false;
-    const finish=(value)=>{
-      if(done)return;done=true;asking=false;
-      yes.removeEventListener('click',accept);no.removeEventListener('click',reject);
-      dialog.removeEventListener('closed',reject);dialog.removeEventListener('close',reject);
-      dialog.close();resolve(value);
+  const layer = byId('ux09-operation-confirm');
+  const heading = byId('ux09-operation-confirm-title');
+  const content = byId('ux09-operation-confirm-message');
+  const yes = byId('ux09-operation-confirm-yes');
+  const no = byId('ux09-operation-confirm-no');
+  if (!layer || !heading || !content || !yes || !no) return Promise.resolve(false);
+  asking = true;
+  heading.textContent = title; content.textContent = description;
+  return new Promise(resolve => {
+    let done = false;
+    const finish = (accepted) => {
+      if (done) return;
+      done = true; asking = false;
+      yes.removeEventListener('click', accept);
+      no.removeEventListener('click', reject);
+      layer.hidden = true; // immediate dismissal on either Android touch event
+      resolve(accepted);
     };
-    const accept=()=>finish(true),reject=()=>finish(false);
-    yes.addEventListener('click',accept);no.addEventListener('click',reject);
-    dialog.addEventListener('closed',reject);dialog.addEventListener('close',reject);
-    dialog.show();
+    const accept = () => finish(true);
+    const reject = () => finish(false);
+    yes.addEventListener('click', accept);
+    no.addEventListener('click', reject);
+    layer.hidden = false;
+    yes.focus();
   });
 }
 export async function beginHostsUpdate({confirm = true} = {}) {

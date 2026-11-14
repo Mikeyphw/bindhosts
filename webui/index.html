@@ -79,11 +79,6 @@
                 <span data-i18n="footer_home"></span>
             </div>
         </div>
-        <div class="bottom-bar-item" id="catalog" page="catalog" aria-label="Sources">
-            <md-icon><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M140-200v-560h680v560H140Zm80-80h520v-400H220v400Zm40-300h440v55H260v-55Zm0 112h370v55H260v-55Zm0 112h290v55H260v-55Z"/></svg></md-icon>
-            <md-icon slot="selected"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M140-760h680v560H140v-560Zm120 180v55h440v-55H260Zm0 112v55h370v-55H260Zm0 112v55h290v-55H260Z"/></svg></md-icon>
-            <div class="bottom-bar-item-text"><span>Sources</span></div>
-        </div>
         <div class="bottom-bar-item" id="hosts" page="hosts">
             <md-icon><svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px"><path d="M160-120q-33 0-56.5-23.5T80-200v-560q0-33 23.5-56.5T160-840h200q33 0 56.5 23.5T440-760v560q0 33-23.5 56.5T360-120H160Zm440 0q-33 0-56.5-23.5T520-200v-560q0-33 23.5-56.5T600-840h200q33 0 56.5 23.5T880-760v560q0 33-23.5 56.5T800-120H600Zm-440-80h200v-560H160v560Zm440 0h200v-560H600v560ZM200-360h120v-80H200v80Zm440 0h120v-80H640v80ZM200-480h120v-80H200v80Zm440 0h120v-80H640v80ZM200-600h120v-80H200v80Zm440 0h120v-80H640v80ZM160-200h200-200Zm440 0h200-200Z"/></svg></md-icon>
             <md-icon slot="selected"><svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px"><path d="M160-120q-33 0-56.5-23.5T80-200v-560q0-33 23.5-56.5T160-840h200q33 0 56.5 23.5T440-760v560q0 33-23.5 56.5T360-120H160Zm440 0q-33 0-56.5-23.5T520-200v-560q0-33 23.5-56.5T600-840h200q33 0 56.5 23.5T880-760v560q0 33-23.5 56.5T800-120H600ZM200-360h120v-80H200v80Zm440 0h120v-80H640v80ZM200-480h120v-80H200v80Zm440 0h120v-80H640v80ZM200-600h120v-80H200v80Zm440 0h120v-80H640v80Z"/></svg></md-icon>
@@ -127,11 +122,17 @@
     </div>
 
     <!-- UX09: global update viewer; closing it never cancels a safe writer. -->
-    <md-dialog id="ux09-operation-confirm">
-      <div slot="headline" id="ux09-operation-confirm-title">Confirm hosts operation</div>
-      <div slot="content" id="ux09-operation-confirm-message"></div>
-      <div slot="actions"><md-text-button id="ux09-operation-confirm-no">Cancel</md-text-button><md-text-button id="ux09-operation-confirm-yes">Continue</md-text-button></div>
-    </md-dialog>
+    <!-- UX10: explicit state-driven confirmation. No md-dialog animation/history race. -->
+    <div id="ux09-operation-confirm" class="ux10-confirm-backdrop" hidden>
+      <div class="ux10-confirm-card" role="dialog" aria-modal="true" aria-labelledby="ux09-operation-confirm-title" aria-describedby="ux09-operation-confirm-message">
+        <h2 id="ux09-operation-confirm-title">Confirm hosts operation</h2>
+        <p id="ux09-operation-confirm-message"></p>
+        <div class="ux10-confirm-actions">
+          <button type="button" id="ux09-operation-confirm-no">Cancel</button>
+          <button type="button" id="ux09-operation-confirm-yes">Continue</button>
+        </div>
+      </div>
+    </div>
     <section id="ux09-operation-overlay" hidden aria-label="Hosts update progress" role="region">
       <div class="ux09-op-header">
         <h2>Hosts update terminal</h2>
@@ -139,6 +140,8 @@
       </div>
       <span id="ux09-operation-status" role="status">IDLE</span>
       <p id="ux09-operation-stage" aria-live="polite">No update started</p>
+      <p id="ux10-operation-source" role="status" aria-live="polite">No source processed yet</p>
+      <div class="ux10-terminal-label">Source-by-source update log</div>
       <pre id="ux09-operation-lines" aria-label="Real progress events"></pre>
       <p id="ux09-operation-summary" role="status"></p>
       <p class="ux09-op-note">Closing this screen does not stop the hosts updater. All progress events are read from private on-device state.</p>

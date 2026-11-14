@@ -322,6 +322,10 @@ tg_r2_once() {
     chmod 600 "$_tg_logtemp"
     mv -f "$_tg_logtemp" "$TG_R2_LOG"
   fi
+  # Long-running watch does not exit between cycles; refresh the count here.
+  if [ -f "$TG_R1_MODDIR/dynamic_description_ux10.sh" ]; then
+    sh "$TG_R1_MODDIR/dynamic_description_ux10.sh" refresh >/dev/null 2>&1 || :
+  fi
   say "R2_MONITOR_ONCE_PASS: changes=$_tg_changes baseline=$_tg_baseline"
 }
 

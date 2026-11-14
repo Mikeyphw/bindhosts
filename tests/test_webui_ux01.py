@@ -24,9 +24,12 @@ class UX01Tests(unittest.TestCase):
             self.assertIn(f"page/{name}/{name}.html?raw", route)
             self.assertIn(f"page/{name}/{name}.js", route)
             self.assertIn(f'{name}: {{ html:', route)
-            self.assertIn(f'page="{name}"', index)
+            if name == 'apps':
+                self.assertIn(f'page="{name}"', index)
+            else:
+                self.assertIn('id="ux10-manage-presets"', self.read('webui/page/hosts/hosts.html'))
             self.assertIn(f'page/{name}/{name}.css', self.read('webui/index.css'))
-        self.assertEqual(len(re.findall(r'page="(?:home|catalog|apps|hosts|more)"', index)), 5)
+        self.assertEqual(len(re.findall(r'page="(?:home|catalog|apps|hosts|more)"', index)), 4)
         self.assertIn('<span>Rules</span>', index)
 
     def test_catalog_only_allows_static_preset_commands(self):

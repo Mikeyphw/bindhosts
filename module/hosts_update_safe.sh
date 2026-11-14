@@ -73,6 +73,21 @@ validate_url() {
   case "$1" in https://*) : ;; *) fail "non-HTTPS source refused" ;; esac
   case "$1" in *[!A-Za-z0-9._~:/?\&=%+#@!,\-]*|'https://'|'') fail 'invalid source URL characters' ;; esac
 }
+# UX10: label sources without printing URL credentials, query strings, or fragments.
+# Preset names are fixed; manually added sources display only a validated hostname.
+ux10_source_label() {
+  case "$1" in
+    https://adaway.org/hosts.txt) printf 'AdAway adaway.org' ;;
+    https://raw.githubusercontent.com/Vaz15k/Cubic-AdBlock/*) printf 'Cubic AdBlock github.com' ;;
+    https://energized.pro/spark/*) printf 'Energized Spark energized.pro' ;;
+    https://energized.pro/blu/*) printf 'Energized Blu energized.pro' ;;
+    https://energized.pro/ultimate/*) printf 'Energized Ultimate energized.pro' ;;
+    *)
+      _host=${1#https://}; _host=${_host%%/*}; _host=${_host%%\?*}; _host=${_host%%\#*}
+      case "$_host" in ''|*[!A-Za-z0-9.-]*) printf 'Custom source' ;; *) [ "${#_host}" -le 72 ] && printf 'Custom %s' "$_host" || printf 'Custom source' ;; esac
+      ;;
+  esac
+}
 # A complete source download is mandatory. A failed or truncated source must not create a partial ruleset.
 source_count=0
 skipped_urls=0
@@ -87,20 +102,34 @@ fetch_sources() {
     validate_url "$_line"
     if grep -Fqx -- "$_mode|$_line" "$STAGE/ux09-seen-urls"; then
       skipped_urls=$((skipped_urls+1))
-      ux09_event SKIPPED_DUPLICATE_URL "Count $skipped_urls"
+      ux09_event SKIPPED_DUPLICATE_URL "Count $skipped_urls $(ux10_source_label "$_line")"
       continue
     fi
     printf '%s\n' "$_mode|$_line" >> "$STAGE/ux09-seen-urls"
     source_count=$((source_count+1))
-    ux09_event DOWNLOADING "Source $source_count"
+    ux09_event DOWNLOADING "Source $source_count $(ux10_source_label "$_line")"
     _download="$STAGE/source.$source_count"
     printf '[>] verified HTTPS source %s\n' "$_line"
-    fetch "$_line" "$_download" || fail "download failed: $_line"
-    [ -s "$_download" ] || fail "empty download: $_line"
+    fetch "$_line" "$_download" || {
+      ux09_event FAILED "Source $source_count $(ux10_source_label "$_line") download failed"
+      fail "download failed: $_line"
+    }
+    [ -s "$_download" ] || {
+      ux09_event FAILED "Source $source_count $(ux10_source_label "$_line") empty download"
+      fail "empty download: $_line"
+    }
     [ "$(wc -c < "$_download")" -le 67108864 ] || fail "source exceeds 64 MiB: $_line"
-    awk -v mode="$_mode" -f "$PARSE" "$_download" > "$STAGE/parsed.$source_count" || fail 'invalid downloaded hosts syntax'
-    [ -s "$STAGE/parsed.$source_count" ] || fail "no valid hosts/domain entries: $_line"
-    ux09_event PARSED "Source $source_count validated"
+    awk -v mode="$_mode" -f "$PARSE" "$_download" > "$STAGE/parsed.$source_count" || {
+      ux09_event FAILED "Source $source_count $(ux10_source_label "$_line") invalid source syntax"
+      fail 'invalid downloaded hosts syntax'
+    }
+    [ -s "$STAGE/parsed.$source_count" ] || {
+      ux09_event FAILED "Source $source_count $(ux10_source_label "$_line") contains no valid entries"
+      fail "no valid hosts/domain entries: $_line"
+    }
+    _ux10_bytes=$(wc -c < "$_download" | tr -d ' ')
+    _ux10_lines=$(wc -l < "$STAGE/parsed.$source_count" | tr -d ' ')
+    ux09_event PARSED "Source $source_count $(ux10_source_label "$_line") $_ux10_bytes bytes $_ux10_lines entries parsed"
     cat "$STAGE/parsed.$source_count" >> "$_dest" || fail 'could not stage source entries'
   done < "$_list"
 }
