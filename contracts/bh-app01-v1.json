@@ -1,0 +1,17 @@
+{
+  "schema": "bh-app01/v1",
+  "api_version": 1,
+  "status": "read-only-foundation",
+  "module_id": "bindhosts",
+  "module_baseline": "03974508b6743520ffe576869fa86cb5cf45a55d",
+  "source_pr": 18,
+  "allowed_operations": {
+    "hello": {"mutates": false, "request": {}, "response_fields": ["api", "module", "versionCode", "capabilities"]},
+    "status": {"mutates": false, "request": {}, "response_fields": ["api", "hosts", "operation"]}
+  },
+  "hosts_states": ["ACTIVE", "PAUSED", "INACTIVE", "DISABLED"],
+  "operation_states": ["IDLE", "RUNNING", "DONE", "FAILED", "INTERRUPTED"],
+  "future_mutations": ["pause", "resume", "update", "source_edit", "tracker_enroll", "tracker_restore", "backup_restore"],
+  "future_mutations_enabled": false,
+  "privacy": "never export raw source URLs, tracker package inventory, command output or root errors by default"
+}

@@ -1,0 +1,13 @@
+:root { color-scheme: dark; font-family: system-ui, sans-serif; background: #101318; color: #e5e9f1; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+main { max-width: 650px; margin: auto; padding: 24px 16px 42px; }
+header { padding: 22px 2px 14px; }
+h1 { font-size: 27px; margin: 9px 0; }
+header p, .footer { color: #abb5c2; font-size: 14px; line-height: 1.5; }
+.eyebrow { color: #9dc9ff; font-size: 11px; letter-spacing: .09em; font-weight: bold; }
+section { border: 1px solid #353c48; border-radius: 16px; padding: 18px; background: #1b2029; margin: 14px 0; }
+h2 { margin: 0 0 14px; font-size: 16px; }
+strong { font-size: 20px; }
+button { background: #a5c8ff; color: #13243b; padding: 12px 16px; border: 0; border-radius: 10px; font-weight: bold; }
+button:disabled { opacity: .5; }
