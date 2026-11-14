@@ -7,6 +7,7 @@ on:
       - 'webui/runtime/companion_transport.mjs'
       - 'android/companion/**'
       - 'tests/test_bh_app01_*'
+      - 'scripts/ci/bh_app01_android_sdk.sh'
       - '.github/workflows/bh-app01-foundation.yml'
   push:
     branches:
@@ -49,12 +50,12 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@v3
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
-      - name: Install Android SDK 36
-        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Install and verify Android SDK 36 (no obsolete tools package)
+        shell: bash
+        run: bash scripts/ci/bh_app01_android_sdk.sh
       - name: Build unsigned-scope debug APK (no local Gradle)
         run: gradle -p android/companion --no-daemon :app:assembleDebug :app:testDebugUnitTest
       - name: Record exact SHA and checksum
