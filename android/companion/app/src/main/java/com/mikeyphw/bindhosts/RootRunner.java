@@ -10,6 +10,7 @@ import java.util.concurrent.TimeUnit;
 final class RootRunner {
     private static final String READ_SCRIPT = "/data/adb/modules/bindhosts/companion_api.sh";
     private static final String CONTROL_SCRIPT = "/data/adb/modules/bindhosts/companion_control_v2.sh";
+    private static final String MANAGE_SCRIPT = "/data/adb/modules/bindhosts/companion_manage_v3.sh";
 
     static JSONObject read(String action) throws Exception {
         if (!"hello".equals(action) && !"status".equals(action))
@@ -58,6 +59,36 @@ final class RootRunner {
                 break;
         }
         return body;
+    }
+
+    static boolean isManagementOperation(String op) {
+        if (op == null) return false;
+        switch (op) {
+            case "config-read": case "config-list": case "config-write":
+            case "catalog": case "tracker": case "packages": return true;
+            default: return false;
+        }
+    }
+
+    static boolean validManagementArgument(String arg) {
+        return arg != null && arg.length() >= 1 && arg.length() <= 13000 &&
+                arg.matches("[A-Za-z0-9_.+\\/=,|\\-]+") && !arg.contains("..");
+    }
+
+    static JSONObject manage(String op, String arg) throws Exception {
+        if (!isManagementOperation(op) || !validManagementArgument(arg))
+            throw new SecurityException("Invalid management operation or argument");
+        // Argument is base64-encoded *before* reaching su -c; shell metacharacters
+        // cannot be inserted into the command. The rooted v3 API validates tokens.
+        String encodedArgument = android.util.Base64.encodeToString(
+                arg.getBytes(StandardCharsets.US_ASCII), android.util.Base64.NO_WRAP);
+        JSONObject result = call(MANAGE_SCRIPT, op + " " + encodedArgument);
+        if (result.length() != 3 || result.getInt("api") != 3 || !op.equals(result.getString("action")))
+            throw new IllegalStateException("Incompatible v3 backend reply");
+        String output = result.getString("encoded");
+        if (output.length() > 6500 || !output.matches("(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?"))
+            throw new IllegalStateException("Unsafe v3 response");
+        return result;
     }
 
     private static void state(String value) {

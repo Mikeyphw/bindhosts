@@ -1,5 +1,6 @@
 package com.mikeyphw.bindhosts;
 
+import android.annotation.SuppressLint;
 import android.app.PendingIntent;
 import android.content.Intent;
 import android.os.Build;
@@ -52,9 +53,18 @@ public final class UpdateTileService extends TileService {
                     PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
             startActivityAndCollapse(pending);
         } else {
-            startActivityAndCollapse(intent);
+            launchLegacy(intent);
         }
     }
+
+    /** Android 8–13 require the Intent overload; the PendingIntent overload starts at API 34.
+     * This narrowly scoped exemption is never used on Android 14+.
+     */
+    @SuppressLint("StartActivityAndCollapseDeprecated")
+    private void launchLegacy(Intent intent) {
+        startActivityAndCollapse(intent);
+    }
+
     private void render(int state, String subtitle) {
         Tile tile = getQsTile();
         if (tile == null) return;

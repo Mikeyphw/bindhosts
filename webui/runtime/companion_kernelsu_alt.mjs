@@ -27,6 +27,76 @@ function eventsText(encoded) {
   if (text.length > 4600 || text.split('\n').some(row => row && (row.length >= 180 || !/^[A-Z_]+\|[A-Za-z0-9_ .=:\-|]+$/.test(row)))) throw new Error('Invalid events');
   return text;
 }
+// P04B: an exact command registry, not a general shell proxy.
+const CONFIG = `sh ${MOD}/hosts_config_safe.sh `;
+const CATALOG = `sh ${MOD}/source_catalog.sh `;
+const BATCH = `sh ${MOD}/source_catalog_batch_ux09.sh `;
+const TRACKER = `sh ${MOD}/bindhosts.sh tracker `;
+const BASE = '/data/adb/bindhosts';
+const packageName = /^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)+$/;
+const token = /^[A-Za-z0-9_-]{12,60}$/;
+const encoded = /^[A-Za-z0-9+/=]{1,12000}$/;
+function kind(name) {
+  return ['sources','sources_whitelist','blacklist','whitelist','custom'].includes(name) ||
+    (/^custom_[A-Za-z0-9_.-]+\.txt$/.test(name) && !name.includes('..'));
+}
+function decodeManagementResponse(base64) {
+  const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+  if (bytes.length > 4800) throw new Error('Oversized management response');
+  return new TextDecoder('utf-8', {fatal:true}).decode(bytes);
+}
+export function managementCommand(command) {
+  if (typeof command !== 'string') return null;
+  if (command === CATALOG + 'status') return {op:'catalog', arg:'status'};
+  if (command === BATCH + 'applied-status') return {op:'catalog',arg:'applied-status'};
+  if (command === BATCH + 'manual-list') return {op:'catalog',arg:'manual-list'};
+  if (command.startsWith(BATCH + 'batch ')) {
+    const selection=command.slice((BATCH+'batch ').length);
+    if (selection==='none' || /^[a-z0-9-]+(?:,[a-z0-9-]+)*$/.test(selection))
+      return {op:'catalog',arg:'batch|'+selection};
+  }
+  const readPrefix=`cat "${BASE}/`;
+  if (command.startsWith(readPrefix) && command.endsWith('"')) {
+    const file=command.slice(readPrefix.length,-1);
+    const k=file.endsWith('.txt') && file.startsWith('custom_') ? file : file.endsWith('.txt') ? file.slice(0,-4) : '';
+    if (kind(k)) return {op:'config-read',arg:k};
+  }
+  if (command === `ls ${BASE} | grep "^custom.*\\.txt$" | grep -vx "custom.txt"`)
+    return {op:'config-list',arg:'custom'};
+  if (command.startsWith(CONFIG)) {
+    const parts=command.slice(CONFIG.length).split(' ');
+    const [verb,a,b,c]=parts;
+    if (['add','remove','toggle'].includes(verb) && parts.length===3 && kind(a) && encoded.test(b))
+      return {op:'config-write',arg:[verb,a,b].join('|')};
+    if (verb==='replace' && parts.length===4 && kind(a) && encoded.test(b) && encoded.test(c))
+      return {op:'config-write',arg:[verb,a,b,c].join('|')};
+    if (['stage-begin','stage-abort'].includes(verb) && parts.length===2 && token.test(a))
+      return {op:'config-write',arg:[verb,a].join('|')};
+    if (verb==='stage-chunk' && parts.length===3 && token.test(a) && encoded.test(b))
+      return {op:'config-write',arg:[verb,a,b].join('|')};
+    if (verb==='stage-commit' && parts.length===3 && token.test(a) && kind(b))
+      return {op:'config-write',arg:[verb,a,b].join('|')};
+    if (verb==='delete-custom' && parts.length===2 && /^custom_[A-Za-z0-9_.-]+\.txt$/.test(a) && !a.includes('..'))
+      return {op:'config-write',arg:[verb,a].join('|')};
+    if (verb==='rename-custom' && parts.length===3 && kind(a) && kind(b) && a.startsWith('custom_') && b.startsWith('custom_'))
+      return {op:'config-write',arg:[verb,a,b].join('|')};
+    if (verb==='import-custom' && parts.length===3 && encoded.test(a) && kind(b) && b.startsWith('custom_'))
+      return {op:'config-write',arg:[verb,a,b].join('|')};
+  }
+  if (command === TRACKER + 'json status') return {op:'tracker',arg:'status'};
+  if (command === TRACKER + 'json rules') return {op:'tracker',arg:'rules'};
+  if (command === 'pm list packages -3') return {op:'packages',arg:'user'};
+  if (command.startsWith(TRACKER)) {
+    const parts=command.slice(TRACKER.length).split(' ');
+    const [verb,pkg]=parts;
+    if (['preview','enroll','unenroll','exclude','include'].includes(verb) &&
+        parts.length===2 && packageName.test(pkg)) return {op:'tracker',arg:verb+'|'+pkg};
+    if (verb==='monitor' && parts.length===2 && ['enable','disable','once'].includes(pkg))
+      return {op:'tracker',arg:'monitor|'+pkg};
+  }
+  return null;
+}
+
 export async function exec(command) {
   if (typeof command !== 'string') return refused();
   try {
@@ -57,6 +127,13 @@ export async function exec(command) {
     if (command === UPDATE_EVENTS) {
       const result = await native().invoke('update-events');
       return success(eventsText(result.encoded));
+    }
+    // P04B: only exact UX10 commands are mapped; arguments are passed as data
+    // through the v3 validated native boundary, never executed as shell text.
+    const management = managementCommand(command);
+    if (management) {
+      const response = await native().invoke(management.op, management.arg);
+      return success(decodeManagementResponse(response.encoded));
     }
   } catch { return refused(); }
   return refused();

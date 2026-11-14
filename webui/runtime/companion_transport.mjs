@@ -2,7 +2,8 @@
 // KernelSU host remains read-only on this transport; the ordinary WebUI uses
 // its own existing UX08/UX09 interfaces, not this Android adapter.
 const READ_ACTIONS = new Set(['hello', 'status']);
-const NATIVE_ACTIONS = new Set([...READ_ACTIONS, 'pause','resume','update-start','update-status','update-events']);
+const MANAGEMENT_ACTIONS = new Set(['config-read','config-list','config-write','catalog','tracker','packages']);
+const NATIVE_ACTIONS = new Set([...READ_ACTIONS, 'pause','resume','update-start','update-status','update-events', ...MANAGEMENT_ACTIONS]);
 const HOSTS = new Set(['ACTIVE', 'PAUSED', 'INACTIVE', 'DISABLED']);
 const OPERATION = new Set(['IDLE', 'RUNNING', 'DONE', 'FAILED', 'INTERRUPTED']);
 const STEPS = new Set(['NONE','PREPARING','DOWNLOADING','PARSED','SKIPPED_DUPLICATE_URL','DEDUPLICATING','ALLOWLIST','GENERATING','COMMITTING','DONE','UNCHANGED','FAILED','STATS']);
@@ -21,6 +22,11 @@ export function validateReply(name, body) {
     } else if (!HOSTS.has(body.hosts) || !OPERATION.has(body.operation)) {
       throw new Error('Invalid backend state');
     }
+  } else if (MANAGEMENT_ACTIONS.has(name)) {
+    if (body.api !== 3 || body.action !== name || Object.keys(body).sort().join(',') !== 'action,api,encoded' ||
+        typeof body.encoded !== 'string' || body.encoded.length > 6500 ||
+        !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(body.encoded))
+      throw new Error('Invalid management reply');
   } else {
     if (body.api !== 2 || body.action !== name) throw new Error('Incompatible native control API');
     switch (name) {
@@ -70,13 +76,18 @@ export function nativeAppTransport(bridge, timeoutMs = 8000) {
     } catch (err) { p.reject(err); }
   };
   return Object.freeze({
-    invoke(name) {
+    invoke(name, arg) {
       operationName(name, NATIVE_ACTIONS);
+      const management = MANAGEMENT_ACTIONS.has(name);
+      if (management && (typeof arg !== 'string' || arg.length < 1 || arg.length > 13000 ||
+          !/^[A-Za-z0-9_.+/=,|\-]+$/.test(arg) || arg.includes('..')))
+        throw new Error('Invalid management arguments');
+      if (!management && arg !== undefined) throw new Error('Unexpected management arguments');
       const id = 'bh' + (++sequence).toString(36);
       return new Promise((resolve, reject) => {
         const timer = setTimeout(() => { pending.delete(id); reject(new Error('Native operation timed out')); }, timeoutMs);
         pending.set(id, {name, resolve, reject, timer});
-        try { bridge.postMessage(JSON.stringify({id, op:name})); }
+        try { bridge.postMessage(JSON.stringify(management ? {id, op:name, arg} : {id, op:name})); }
         catch { clearTimeout(timer); pending.delete(id); reject(new Error('Native bridge unavailable')); }
       });
     }

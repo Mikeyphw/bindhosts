@@ -26,9 +26,9 @@ assert.match(r.stdout,/module read-back, not DNS proof/);
 assert.deepEqual(invocations.map(x=>x.op),['status','hello','status']);
 for(const command of [
   'sh /data/adb/modules/bindhosts/bindhosts.sh --hosts-control update',
-  'sh /data/adb/modules/bindhosts/bindhosts.sh tracker json status',
-  'pm list packages -3',
-  'sh /data/adb/modules/bindhosts/bindhosts.sh tracker preview com.example.app',
+  'sh /data/adb/modules/bindhosts/bindhosts.sh tracker json status;id',
+  'pm list packages -3;id',
+  'sh /data/adb/modules/bindhosts/bindhosts.sh tracker preview com.example.app;id',
   'sh /data/adb/modules/bindhosts/hosts_operation_ux09.sh worker',
   'cat "/data/adb/modules/bindhosts/module.prop";touch /tmp/unwanted',
   'sh /data/adb/modules/bindhosts/bindhosts.sh --setup-link',

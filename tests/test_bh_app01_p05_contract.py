@@ -1,6 +1,7 @@
 """P05 host-control boundaries, source audit and synthetic non-root backend tests."""
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import tempfile
@@ -49,6 +50,22 @@ class P05Source(unittest.TestCase):
         self.assertIn('ACTION_CONFIRM_UPDATE',update)
         self.assertNotIn('RootRunner.control("update-start")',update)
         self.assertIn('setPositiveButton("Update"', (ANDROID/'MainActivity.java').read_text())
+
+    def test_update_qs_tile_api_split_and_narrow_lint_exemption(self):
+        source=(ANDROID/'UpdateTileService.java').read_text()
+        self.assertIn('if (Build.VERSION.SDK_INT >= 34)',source)
+        self.assertIn('startActivityAndCollapse(pending);',source)
+        self.assertIn('launchLegacy(intent);',source)
+        self.assertEqual(source.count('startActivityAndCollapse(intent);'),1)
+        self.assertRegex(source,r'@SuppressLint\("StartActivityAndCollapseDeprecated"\)\s+private void launchLegacy\(Intent intent\)\s*\{\s*startActivityAndCollapse\(intent\);\s*\}')
+        # No broad class or onClick suppression; deprecated call isolated to one legacy method.
+        self.assertLess(source.index('public final class UpdateTileService'),source.index('@SuppressLint'))
+        self.assertIn('setAction(MainActivity.ACTION_CONFIRM_UPDATE)',source)
+        workflow=(ROOT/'.github/workflows/bh-app01-foundation.yml').read_text()
+        self.assertIn(':app:lintDebug',workflow)
+        gradle=(ROOT/'android/companion/app/build.gradle.kts').read_text()
+        self.assertNotIn('abortOnError = false',gradle)
+        self.assertNotIn('disable.add("StartActivityAndCollapseDeprecated")',gradle)
 
     def test_explicit_ci_policy(self):
         policy=json.loads((ROOT/'ci/bh-app01-required-workflows.json').read_text())

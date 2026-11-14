@@ -39,7 +39,7 @@ public final class MainActivity extends Activity {
         frame.setOrientation(LinearLayout.VERTICAL);
         frame.setBackgroundColor(Color.rgb(18, 20, 24));
         TextView disclaimer = new TextView(this);
-        disclaimer.setText("UX10 shared UI · VERIFIED HOSTS CONTROLS · other edits disabled");
+        disclaimer.setText("UX10 shared UI · VERIFIED HOSTS CONTROLS · bounded Rules, Sources and TrackerGuard operations · backups/HTTPS disabled");
         disclaimer.setTextColor(Color.WHITE);
         disclaimer.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
         disclaimer.setPadding(18, 12, 18, 12);
@@ -84,25 +84,36 @@ public final class MainActivity extends Activity {
             if (!isMainFrame || !ORIGIN.equals(sourceOrigin.toString()) ||
                     message.getType() != WebMessageCompat.TYPE_STRING) return;
             String data = message.getData();
-            if (data == null || data.length() > 512) return;
+            if (data == null || data.length() > 18500) return;
             final String id;
             final String op;
+            final String argument;
+            final boolean management;
             try {
                 JSONObject request = new JSONObject(data);
-                if (request.length() != 2) return;
                 id = request.getString("id");
                 op = request.getString("op");
-                if (!id.matches("bh[a-z0-9]{1,16}") || (!"hello".equals(op) && !"status".equals(op) &&
-                        !"pause".equals(op) && !"resume".equals(op) &&
-                        !"update-start".equals(op) && !"update-status".equals(op) && !"update-events".equals(op))) return;
+                management = RootRunner.isManagementOperation(op);
+                if (!id.matches("bh[a-z0-9]{1,16}")) return;
+                if (management) {
+                    if (request.length() != 3 || !request.has("arg")) return;
+                    argument = request.getString("arg");
+                    if (!RootRunner.validManagementArgument(argument)) return;
+                } else {
+                    if (request.length() != 2 || (!"hello".equals(op) && !"status".equals(op) &&
+                            !"pause".equals(op) && !"resume".equals(op) &&
+                            !"update-start".equals(op) && !"update-status".equals(op) && !"update-events".equals(op))) return;
+                    argument = "";
+                }
             } catch (Exception ignored) { return; }
             worker.execute(() -> {
                 JSONObject response = new JSONObject();
                 try {
                     response.put("id", id);
                     response.put("ok", true);
-                    response.put("value", ("hello".equals(op) || "status".equals(op))
-                            ? RootRunner.read(op) : RootRunner.control(op));
+                    response.put("value", management ? RootRunner.manage(op, argument) :
+                            (("hello".equals(op) || "status".equals(op))
+                            ? RootRunner.read(op) : RootRunner.control(op)));
                 } catch (Exception denied) {
                     try { response.put("id", id); response.put("ok", false); } catch (Exception ignored) { return; }
                 }

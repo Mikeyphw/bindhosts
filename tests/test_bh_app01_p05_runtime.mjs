@@ -33,9 +33,9 @@ const previous=calls.length;
 for(const injected of [
   P05_COMMANDS[0]+';touch /tmp/bad', P05_COMMANDS[0]+' ', P05_COMMANDS[2]+' &',
   'sh /data/adb/modules/bindhosts/bindhosts.sh --force-update',
-  'sh /data/adb/modules/bindhosts/bindhosts.sh tracker json rules',
+  'sh /data/adb/modules/bindhosts/bindhosts.sh tracker json rules;id',
   'sh /data/adb/modules/bindhosts/hosts_operation_ux09.sh worker',
-  'pm list packages -3', null, {},
+  'pm list packages -3;id', null, {},
 ]) {
   const answer=await exec(injected);
   assert.equal(answer.errno,13,`must refuse ${String(injected)}`);
