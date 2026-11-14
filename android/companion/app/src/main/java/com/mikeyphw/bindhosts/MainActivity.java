@@ -23,8 +23,9 @@ import java.util.Collections;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-/** The original UX10 WebUI, packed for a finite read-only native transport. */
+/** Shared UX10 UI with a finite, versioned native hosts-control bridge. */
 public final class MainActivity extends Activity {
+    public static final String ACTION_CONFIRM_UPDATE = "com.mikeyphw.bindhosts.CONFIRM_UPDATE";
     private static final String ORIGIN = "https://appassets.androidplatform.net";
     private ExecutorService worker;
     private WebView web;
@@ -38,7 +39,7 @@ public final class MainActivity extends Activity {
         frame.setOrientation(LinearLayout.VERTICAL);
         frame.setBackgroundColor(Color.rgb(18, 20, 24));
         TextView disclaimer = new TextView(this);
-        disclaimer.setText("UX10 shared UI · READ-ONLY PREVIEW · changes disabled");
+        disclaimer.setText("UX10 shared UI · VERIFIED HOSTS CONTROLS · other edits disabled");
         disclaimer.setTextColor(Color.WHITE);
         disclaimer.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
         disclaimer.setPadding(18, 12, 18, 12);
@@ -91,14 +92,17 @@ public final class MainActivity extends Activity {
                 if (request.length() != 2) return;
                 id = request.getString("id");
                 op = request.getString("op");
-                if (!id.matches("bh[a-z0-9]{1,16}") || (!"hello".equals(op) && !"status".equals(op))) return;
+                if (!id.matches("bh[a-z0-9]{1,16}") || (!"hello".equals(op) && !"status".equals(op) &&
+                        !"pause".equals(op) && !"resume".equals(op) &&
+                        !"update-start".equals(op) && !"update-status".equals(op) && !"update-events".equals(op))) return;
             } catch (Exception ignored) { return; }
             worker.execute(() -> {
                 JSONObject response = new JSONObject();
                 try {
                     response.put("id", id);
                     response.put("ok", true);
-                    response.put("value", RootRunner.read(op));
+                    response.put("value", ("hello".equals(op) || "status".equals(op))
+                            ? RootRunner.read(op) : RootRunner.control(op));
                 } catch (Exception denied) {
                     try { response.put("id", id); response.put("ok", false); } catch (Exception ignored) { return; }
                 }
@@ -106,6 +110,37 @@ public final class MainActivity extends Activity {
             });
         });
         web.loadUrl(ORIGIN + "/assets/ux10/index.html");
+        if (ACTION_CONFIRM_UPDATE.equals(getIntent().getAction())) showConfirmUpdate();
+    }
+    @Override protected void onNewIntent(android.content.Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        if (ACTION_CONFIRM_UPDATE.equals(intent.getAction())) showConfirmUpdate();
+    }
+    private void showConfirmUpdate() {
+        // Update tile opens an explicit native confirmation; backend does not
+        // accept concurrent or paused-state updates.
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("Update Bindhosts rules?")
+                .setMessage("Download configured sources and apply only after verification. An existing update cannot be restarted concurrently.")
+                .setNegativeButton("Cancel", (dialog, which) -> {})
+                .setPositiveButton("Update", (dialog, which) -> {
+                    worker.execute(() -> {
+                        String result;
+                        try {
+                            JSONObject receipt = RootRunner.control("update-start");
+                            if (!receipt.getBoolean("accepted")) throw new IllegalStateException();
+                            result = "Hosts update started. Open Rules to inspect progress.";
+                        } catch (Exception denied) {
+                            result = "Update refused or unverified. Check Rules and diagnostics.";
+                        }
+                        final String message = result;
+                        runOnUiThread(() -> {
+                            if (!isFinishing() && !isDestroyed())
+                                android.widget.Toast.makeText(this, message, android.widget.Toast.LENGTH_LONG).show();
+                        });
+                    });
+                }).show();
     }
     @Override public void onBackPressed() {
         if (web == null) { super.onBackPressed(); return; }

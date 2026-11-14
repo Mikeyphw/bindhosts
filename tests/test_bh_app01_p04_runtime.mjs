@@ -25,11 +25,11 @@ assert.match(r.stdout,/versionCode 21611/);
 assert.match(r.stdout,/module read-back, not DNS proof/);
 assert.deepEqual(invocations.map(x=>x.op),['status','hello','status']);
 for(const command of [
-  'sh /data/adb/modules/bindhosts/bindhosts.sh --hosts-control pause',
-  'sh /data/adb/modules/bindhosts/bindhosts.sh --hosts-control resume',
   'sh /data/adb/modules/bindhosts/bindhosts.sh --hosts-control update',
   'sh /data/adb/modules/bindhosts/bindhosts.sh tracker json status',
   'pm list packages -3',
+  'sh /data/adb/modules/bindhosts/bindhosts.sh tracker preview com.example.app',
+  'sh /data/adb/modules/bindhosts/hosts_operation_ux09.sh worker',
   'cat "/data/adb/modules/bindhosts/module.prop";touch /tmp/unwanted',
   'sh /data/adb/modules/bindhosts/bindhosts.sh --setup-link',
   'svc power reboot || reboot',
@@ -40,7 +40,7 @@ for(const command of [
   assert.equal(denied.errno,13,`fail closed: ${String(command)}`);
   assert.equal(invocations.length,before,'unexpected native bridge call');
 }
-assert.throws(()=>spawn('sh',['--force-update']),/READ_ONLY/);
+assert.throws(()=>spawn('sh',['--force-update']),/P05_REFUSED/);
 console.log('BH_APP01_P04_COMMAND_GATE_PASS read=2 writes_refused=11');
 // The same UX10 navigation/back contract must be reachable from Android Back.
 const { WXEventHandler } = await import('../webui/runtime/companion_webuix.mjs');

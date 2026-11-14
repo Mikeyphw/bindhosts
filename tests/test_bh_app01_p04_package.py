@@ -25,7 +25,7 @@ class CompanionUx10Packaging(unittest.TestCase):
         self.assertIn('!"https".equals(url.getScheme())',source)
         self.assertIn('appassets.androidplatform.net',source)
         self.assertIn('WebResourceResponse("text/plain", "UTF-8", 403',source)
-        self.assertIn('READ-ONLY PREVIEW',source)
+        self.assertIn('VERIFIED HOSTS CONTROLS',source)
         self.assertIn('addWebMessageListener',source)
         self.assertNotIn('addJavascriptInterface',source)
         self.assertNotIn('setAllowFileAccess(true)',source)
@@ -38,7 +38,7 @@ class CompanionUx10Packaging(unittest.TestCase):
         self.assertIn('command === HOSTS_READ',shim)
         self.assertIn('command === MODULE_PROP_READ',shim)
         self.assertIn('return refused()',shim)
-        self.assertIn('throw new Error(\'BH_APP01_P04_READ_ONLY',shim)
+        self.assertIn('throw new Error(\'BH_APP01_P05_REFUSED',shim)
         self.assertNotIn('ProcessBuilder',shim)
 
     def test_ci_runs_real_webui_bundle_before_gradle(self):

@@ -18,7 +18,7 @@ class SourceContract(unittest.TestCase):
         self.assertNotIn('addJavascriptInterface', activity)
         self.assertIn('addWebMessageListener', activity)
         self.assertIn('isMainFrame', activity)
-        self.assertIn('Unsupported operation', runner)
+        self.assertIn('Unsupported read operation', runner)
         self.assertNotIn('force-update', tile)
         self.assertNotIn('force-reset', tile)
         self.assertIn('STATE_UNAVAILABLE', tile)

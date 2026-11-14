@@ -6,40 +6,89 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
 
-/** Finite root reader; no user-provided shell strings. Never called on main thread. */
+/** Fixed-verb root broker. No caller-controlled command, path or shell arguments. */
 final class RootRunner {
-    private static final String SCRIPT = "/data/adb/modules/bindhosts/companion_api.sh";
+    private static final String READ_SCRIPT = "/data/adb/modules/bindhosts/companion_api.sh";
+    private static final String CONTROL_SCRIPT = "/data/adb/modules/bindhosts/companion_control_v2.sh";
+
     static JSONObject read(String action) throws Exception {
-        if (!"hello".equals(action) && !"status".equals(action)) throw new SecurityException("Unsupported operation");
-        Process process = new ProcessBuilder("su", "-c", "/system/bin/sh " + SCRIPT + " " + action)
+        if (!"hello".equals(action) && !"status".equals(action))
+            throw new SecurityException("Unsupported read operation");
+        JSONObject body = call(READ_SCRIPT, action);
+        if (body.getInt("api") != 1) throw new IllegalStateException("Incompatible read API");
+        if ("status".equals(action)) {
+            state(body.getString("hosts"));
+            operation(body.getString("operation"));
+        } else {
+            if (!"bindhosts".equals(body.getString("module")) || body.getInt("versionCode") <= 0)
+                throw new IllegalStateException("Invalid module handshake");
+        }
+        return body;
+    }
+
+    static JSONObject control(String action) throws Exception {
+        switch (action) {
+            case "pause": case "resume": case "update-start": case "update-status": case "update-events": break;
+            default: throw new SecurityException("Unsupported control operation");
+        }
+        JSONObject body = call(CONTROL_SCRIPT, action);
+        if (body.getInt("api") != 2 || !action.equals(body.getString("action")))
+            throw new IllegalStateException("Incompatible control API");
+        switch (action) {
+            case "pause": case "resume":
+                if (!body.getBoolean("verified") || !body.getString("hosts").equals(action.equals("pause") ? "PAUSED" : "ACTIVE"))
+                    throw new IllegalStateException("Hosts read-back failed");
+                break;
+            case "update-start":
+                if (!body.getBoolean("accepted") || !("RUNNING".equals(body.getString("operation")) || "DONE".equals(body.getString("operation"))))
+                    throw new IllegalStateException("Journaled update launch failed");
+                break;
+            case "update-status":
+                operation(body.getString("operation"));
+                String step = body.getString("step");
+                String receipt = body.getString("receipt");
+                if (!step.matches("NONE|PREPARING|DOWNLOADING|PARSED|SKIPPED_DUPLICATE_URL|DEDUPLICATING|ALLOWLIST|GENERATING|COMMITTING|DONE|UNCHANGED|FAILED|STATS") ||
+                        !receipt.matches("NONE|PASS|FAIL") || ("DONE".equals(body.getString("operation")) && !"PASS".equals(receipt)))
+                    throw new IllegalStateException("Invalid operation receipt");
+                break;
+            case "update-events":
+                String encoded = body.getString("encoded");
+                if (encoded.length() > 6500 || !encoded.matches("(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?"))
+                    throw new IllegalStateException("Invalid event encoding");
+                break;
+        }
+        return body;
+    }
+
+    private static void state(String value) {
+        switch (value) {
+            case "ACTIVE": case "PAUSED": case "INACTIVE": case "DISABLED": return;
+            default: throw new IllegalStateException("Unrecognized hosts state");
+        }
+    }
+    private static void operation(String value) {
+        switch (value) {
+            case "IDLE": case "RUNNING": case "DONE": case "FAILED": case "INTERRUPTED": return;
+            default: throw new IllegalStateException("Unrecognized update state");
+        }
+    }
+
+    private static JSONObject call(String script, String verb) throws Exception {
+        // Both components are private constants or a finite allowlisted token.
+        Process process = new ProcessBuilder("su", "-c", "/system/bin/sh " + script + " " + verb)
                 .redirectErrorStream(false).start();
         try {
-            if (!process.waitFor(8, TimeUnit.SECONDS)) throw new IllegalStateException("Root command timed out");
-            if (process.exitValue() != 0) throw new IllegalStateException("Root or compatible module unavailable");
+            if (!process.waitFor(12, TimeUnit.SECONDS)) throw new IllegalStateException("Root command timed out");
+            if (process.exitValue() != 0) throw new IllegalStateException("Root, module or safe operation unavailable");
             ByteArrayOutputStream buffer = new ByteArrayOutputStream();
             try (InputStream in = process.getInputStream()) {
-                byte[] block = new byte[1024]; int count;
-                while ((count = in.read(block)) != -1) {
-                    if (buffer.size() + count > 8192) throw new IllegalStateException("Oversized module response");
-                    buffer.write(block, 0, count);
+                byte[] block = new byte[1024]; int size;
+                while ((size = in.read(block)) != -1) {
+                    if (buffer.size() + size > 8192) throw new IllegalStateException("Oversized control response");
+                    buffer.write(block, 0, size);
                 }
             }
-            JSONObject body = new JSONObject(buffer.toString(StandardCharsets.UTF_8.name()));
-            if (body.getInt("api") != 1) throw new IllegalStateException("Incompatible module API");
-            if ("status".equals(action)) {
-                switch (body.getString("hosts")) {
-                    case "ACTIVE": case "PAUSED": case "INACTIVE": case "DISABLED": break;
-                    default: throw new IllegalStateException("Unrecognized hosts state");
-                }
-                switch (body.getString("operation")) {
-                    case "IDLE": case "RUNNING": case "DONE": case "FAILED": case "INTERRUPTED": break;
-                    default: throw new IllegalStateException("Unrecognized operation state");
-                }
-            } else {
-                if (!"bindhosts".equals(body.getString("module")) || body.getInt("versionCode") <= 0)
-                    throw new IllegalStateException("Incompatible module handshake");
-            }
-            return body;
+            return new JSONObject(buffer.toString(StandardCharsets.UTF_8.name()));
         } finally {
             process.destroyForcibly();
         }

@@ -1,0 +1,12 @@
+{
+  "schema": "bh-app01/ci-policy/v1",
+  "repository": "Mikeyphw/bindhosts",
+  "branch": "feature/bh-app01-p00-p03-companion-foundation-20261114",
+  "required_workflows": [
+    "bh-app01-foundation.yml",
+    "bindhosts-ux-ci.yml",
+    "trackerguard-ci.yml"
+  ],
+  "ci_qualification": "every required workflow must succeed at the exact head SHA",
+  "release_qualification": "separate: signed artifact and physical Android 16 acceptance are mandatory"
+}
