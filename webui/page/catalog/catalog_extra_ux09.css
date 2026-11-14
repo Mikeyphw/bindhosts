@@ -1,0 +1,24 @@
+/* UX09 selection: compact responsive groups, no duplicate huge catalog cards */
+.catalog-content .ux09-tabs {display:flex;gap:6px;margin:14px 0;overflow-x:auto}
+.catalog-content .ux09-tabs button {border:1px solid var(--md-sys-color-outline-variant);border-radius:100px;background:var(--md-sys-color-surface-container);color:var(--md-sys-color-on-surface);padding:10px 13px;white-space:nowrap;font:inherit;font-size:.85rem}
+.catalog-content .ux09-tabs button[aria-selected="true"] {background:var(--md-sys-color-secondary-container);color:var(--md-sys-color-on-secondary-container)}
+.catalog-content [hidden]{display:none!important}
+.catalog-content [role="tabpanel"] h2 {font-size:1.03rem;margin:18px 0 9px}
+.ux09-catalog-actions {display:flex;flex-wrap:wrap;gap:8px}
+.ux09-in-progress {font-size:.82rem;color:var(--md-sys-color-primary)}
+.ux09-preset-grid {display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:9px}
+.ux09-preset {display:flex;align-items:center;gap:12px;flex-wrap:wrap;min-width:0}
+.ux09-preset input[type=checkbox] {width:22px;height:22px;accent-color:var(--md-sys-color-primary)}
+.ux09-choice-copy {flex:1;min-width:170px;display:flex;flex-direction:column;gap:3px}
+.ux09-choice-copy small {color:var(--md-sys-color-on-surface-variant)}
+.ux09-choice-copy p {font-size:.84rem;color:var(--md-sys-color-on-surface-variant)}
+.ux09-foreign {width:100%;color:var(--md-sys-color-on-surface-variant)}
+.ux09-manual-row {display:flex;align-items:center;flex-wrap:wrap;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid var(--md-sys-color-outline-variant)}
+.ux09-manual-row span {font-size:.8rem;flex:1;overflow-wrap:anywhere;min-width:160px}
+@media(max-width:520px){.ux09-catalog-actions>button{flex:1 1 100%}}
+
+/* Moved HTTP/HTTPS response settings are collapsed near the top of More. */
+.ux09-response-settings{margin:14px 0}
+.ux09-response-settings summary{cursor:pointer;font-weight:650;padding:5px 0;line-height:1.4}
+.ux09-response-settings[open] summary{margin-bottom:16px}
+.ux09-response-settings .ux-card{margin-top:10px}

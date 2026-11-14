@@ -1,0 +1,14 @@
+/* UX09 operation viewer: bounded, non-canceling, respects system insets. */
+#ux09-operation-overlay[hidden] {display:none!important}
+#ux09-operation-overlay {position:fixed;inset:0;z-index:10000;background:var(--md-sys-color-background);color:var(--md-sys-color-on-background);display:flex;flex-direction:column;padding:calc(var(--top-inset) + 12px) 14px calc(var(--bottom-inset) + 14px);box-sizing:border-box;gap:12px}
+.ux09-op-header {display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.ux09-op-header h2 {margin:0;font-size:1.15rem}
+.ux09-op-actions {display:flex;gap:8px}
+.ux09-op-actions button {border-radius:14px;padding:9px 13px;border:1px solid var(--md-sys-color-outline);color:inherit;background:var(--md-sys-color-surface-container);font:inherit}
+#ux09-operation-status {display:inline-block;padding:5px 9px;background:var(--md-sys-color-surface-container-high);border-radius:9px;font-size:.78rem;letter-spacing:.02em}
+#ux09-operation-status[data-state="DONE"] {color:var(--md-sys-color-primary)}
+#ux09-operation-status[data-state="FAILED"],#ux09-operation-status[data-state="INTERRUPTED"] {color:var(--md-sys-color-error)}
+#ux09-operation-stage {font-weight:600;margin:0}
+#ux09-operation-lines {background:var(--md-sys-color-surface-container-low);border:1px solid var(--md-sys-color-outline-variant);border-radius:14px;color:var(--md-sys-color-on-surface);font:.77rem/1.6 ui-monospace,SFMono-Regular,monospace;white-space:pre-wrap;overflow-wrap:anywhere;overflow-y:auto;flex:1;min-height:140px;padding:14px;margin:0}
+#ux09-operation-summary {margin:0;font-size:.84rem;line-height:1.5;max-height:110px;overflow-y:auto}
+.ux09-op-note {font-size:.76rem;color:var(--md-sys-color-on-surface-variant);margin:0}

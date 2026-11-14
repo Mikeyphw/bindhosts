@@ -19,7 +19,7 @@ class UX0304(unittest.TestCase):
   self.assertIn('https_replacement=conditional_user_ca_trust_required',shell)
  def test_ux04_controls_restricted_and_confirmed(self):
   js=(ROOT/'webui/utils/blocked_response.js').read_text()
-  html=(ROOT/'webui/page/catalog/catalog.html').read_text()
+  html=(ROOT/'webui/page/more/more.html').read_text()
   self.assertIn("new Set(['off','transparent','logo'])",js)
   self.assertIn('await confirmAction(',js)
   self.assertIn('id="response-mode"',html)

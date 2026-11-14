@@ -31,12 +31,13 @@ class UX01Tests(unittest.TestCase):
 
     def test_catalog_only_allows_static_preset_commands(self):
         src = self.read('webui/page/catalog/catalog.js')
-        self.assertIn('PRESET_IDS.has(preset.id)', src)
+        self.assertIn('IDS.has(id)', src)
         self.assertIn('textContent', src)
         self.assertNotIn('innerHTML', src)
         self.assertIn('source_catalog.sh', src)
-        self.assertIn('confirmAction', src)
-        self.assertIn('Update hosts', self.read('webui/page/catalog/catalog.html'))
+        self.assertIn('source_catalog_batch_ux09.sh', src)
+        self.assertIn('confirmHostsAction', src)
+        self.assertIn('update hosts', self.read('webui/page/catalog/catalog.html'))
 
     def test_tracker_controls_validate_package_and_confirm(self):
         src = self.read('webui/page/apps/apps.js')

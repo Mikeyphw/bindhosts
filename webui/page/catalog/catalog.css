@@ -1,3 +1,4 @@
+@import "./catalog_extra_ux09.css";
 .ux-content { padding: 16px 16px calc(110px + var(--bottom-inset)); max-width: 1100px; margin: 0 auto; box-sizing: border-box; }
 .ux-page-heading { margin: 8px 4px 20px; }
 .ux-page-heading h1 { font-size: 1.5rem; margin: 3px 0 7px; font-weight: 650; }

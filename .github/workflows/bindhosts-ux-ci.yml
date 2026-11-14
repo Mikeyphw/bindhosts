@@ -68,6 +68,10 @@ jobs:
           sh -n module/response_mode.sh
           sh -n tests/hosts-mount-acceptance.sh
           python3 tests/test_hosts_target_ux03.py
+          sh -n module/hosts_operation_ux09.sh
+          sh -n module/source_catalog_batch_ux09.sh
+          python3 tests/test_hosts_ux09.py
+          python3 tests/test_hosts_update_ux09.py
           python3 tests/test_blocked_response_ux04.py
           python3 tests/test_responder_install_permissions.py
           python3 tests/test_webui_ux0304.py

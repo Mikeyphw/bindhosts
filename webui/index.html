@@ -126,6 +126,24 @@
         <div class="slide-menu-bottom-padding"></div>
     </div>
 
+    <!-- UX09: global update viewer; closing it never cancels a safe writer. -->
+    <md-dialog id="ux09-operation-confirm">
+      <div slot="headline" id="ux09-operation-confirm-title">Confirm hosts operation</div>
+      <div slot="content" id="ux09-operation-confirm-message"></div>
+      <div slot="actions"><md-text-button id="ux09-operation-confirm-no">Cancel</md-text-button><md-text-button id="ux09-operation-confirm-yes">Continue</md-text-button></div>
+    </md-dialog>
+    <section id="ux09-operation-overlay" hidden aria-label="Hosts update progress" role="region">
+      <div class="ux09-op-header">
+        <h2>Hosts update terminal</h2>
+        <div class="ux09-op-actions"><button type="button" id="ux09-operation-refresh">Refresh</button><button type="button" id="ux09-operation-close">Close</button></div>
+      </div>
+      <span id="ux09-operation-status" role="status">IDLE</span>
+      <p id="ux09-operation-stage" aria-live="polite">No update started</p>
+      <pre id="ux09-operation-lines" aria-label="Real progress events"></pre>
+      <p id="ux09-operation-summary" role="status"></p>
+      <p class="ux09-op-note">Closing this screen does not stop the hosts updater. All progress events are read from private on-device state.</p>
+    </section>
+
     <!-- Floating Action Buttons -->
     <div class="fab-container tcpdump-btn">
         <div class="action-stack">

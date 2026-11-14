@@ -8,6 +8,8 @@ ROOT=${BH_CATALOG_ROOT:-/data/adb/bindhosts}
 CAT=${BH_CATALOG_FILE:-/data/adb/modules/bindhosts/data/source-catalog.tsv}
 SRC=$ROOT/sources.txt
 LOCK=$ROOT/.source-catalog.lock
+UX09_UPDATE_LOCK=$ROOT/.hosts-update.lock
+UX09_UPDATE_LOCKED=0
 TMP=''
 OWN='source-catalog:'
 
@@ -27,6 +29,7 @@ awk -F'|' '
 
 cleanup() {
   [ -z "$TMP" ] || rm -f "$TMP"
+  [ "${UX09_UPDATE_LOCKED:-0}" = 1 ] && rmdir "$UX09_UPDATE_LOCK" 2>/dev/null || :
   [ "${LOCKED:-0}" = 1 ] && rmdir "$LOCK" 2>/dev/null || :
 }
 trap cleanup EXIT
@@ -62,6 +65,8 @@ source_state() {
 lock_source() {
   mkdir "$LOCK" 2>/dev/null || fail 'catalog editor is locked'
   LOCKED=1
+  mkdir "$UX09_UPDATE_LOCK" 2>/dev/null || fail 'hosts update in progress'
+  UX09_UPDATE_LOCKED=1
   [ ! -L "$SRC" ] && [ -f "$SRC" ] || fail 'sources changed to an unsafe file'
   TMP=$(mktemp "$ROOT/.sources-catalog.XXXXXXXX") || fail 'cannot stage configuration'
   chmod 0600 "$TMP"

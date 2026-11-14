@@ -1,56 +1,44 @@
 <div class="ux-content catalog-content">
   <header class="ux-page-heading">
     <p class="ux-eyebrow">HOSTS PROTECTION</p>
-    <h1>Source catalog</h1>
-    <p>Choose maintained hosts lists without copying URLs. Existing custom sources stay untouched.</p>
+    <h1>Sources</h1>
+    <p>Configure trusted lists. Selecting a preset is not the same as applying it to the active hosts file.</p>
   </header>
-  <section class="ux-card catalog-actions" aria-labelledby="catalog-help-title">
-    <div>
-      <h2 id="catalog-help-title">Your subscriptions</h2>
-      <p>Enable a preset to add it to your configuration. Changes take effect after you update hosts.</p>
-    </div>
-    <button class="ux-primary-button" type="button" id="catalog-update">Update hosts</button>
-  </section>
-  <div id="catalog-status" role="status" aria-live="polite" class="ux-note">Reading configured sources…</div>
-  <section aria-label="Curated source presets" id="catalog-list" class="catalog-grid"></section>
-  <section class="ux-card ux-muted-card">
-    <h2>About list combinations</h2>
-    <p>Only one Energized tier is managed at a time. Large combined lists overlap heavily, so adding every tier rarely improves protection.</p>
-    <p class="ux-small">Source status reports your local configuration, not a verified network download. Preset links are independently maintained by their publishers.</p>
-  </section>
-  <section class="ux-card" aria-labelledby="response-heading">
-    <h2 id="response-heading">Blocked-page image (HTTP, optional HTTPS)</h2>
-    <p class="ux-small">Loopback-only blocked images. Plain HTTP works without a certificate; HTTPS requires a separate, explicitly trusted local CA and is never universal. Both are off by default.</p>
-    <label for="response-mode">Response style</label>
-    <select id="response-mode" class="ux-response-select">
-      <option value="off">Standard connection failure</option>
-      <option value="transparent">Transparent GIF</option>
-      <option value="logo">Bindhosts blocked image</option>
-    </select>
-    <button id="response-apply" type="button" class="ux-secondary-button">Apply response style</button>
-    <p id="response-status" class="ux-small" role="status" aria-live="polite">Reading response mode…</p>
-    <div class="ux-card ux-muted-card" id="https-response-panel">
-      <h3>HTTPS image responses (advanced, opt-in)</h3>
-      <p class="ux-small">Generates a private local CA on this device. If you explicitly install and trust that CA in Android, browsers that accept user certificates can see an image for blocked HTTPS hosts. This expands certificate trust: only enable it if you understand the risk. Certificate pinning, app trust rules, ECH and QUIC may still prevent it.</p>
-      <p class="ux-small">The TLS service listens only on 127.0.0.1:443, never forwards connections or logs requests, and issues certificates only for bindhosts-managed blocked domains. Disabling HTTPS does <strong>not</strong> uninstall a CA you manually trusted in Android Settings.</p>
-      <p class="ux-small" id="https-response-status" role="status" aria-live="polite" style="overflow-wrap:anywhere">HTTPS is disabled.</p>
-      <div class="catalog-card-footer" style="display:flex;flex-wrap:wrap;gap:8px">
-        <button type="button" class="ux-secondary-button" id="https-cert-create">Generate local CA</button>
-        <button type="button" class="ux-secondary-button" id="https-cert-export">Export CA certificate</button>
-        <button type="button" class="ux-secondary-button" id="https-response-enable">Enable HTTPS</button>
-        <button type="button" class="ux-secondary-button" id="https-response-disable">Disable HTTPS</button>
-        <button type="button" class="ux-secondary-button" id="https-response-test">Test local TLS</button>
-        <button type="button" class="ux-secondary-button" id="https-certificate-settings">Open Android security settings</button>
-      </div>
-      <p class="ux-small">After exporting, use Android Settings → Security → Encryption &amp; credentials → Install a certificate → CA certificate. Compare the full SHA-256 fingerprint shown above with the certificate before trusting it. User-installed CAs expand browser/app trust; remove the CA manually when no longer needed. The local TLS test does not prove Android or browser trust.</p>
+  <section class="ux-card ux09-catalog-summary">
+    <h2>Protection lists</h2>
+    <p role="status" aria-live="polite" id="catalog-status">Checking configured and applied lists…</p>
+    <span data-ux09-running class="ux09-in-progress"></span>
+    <div class="ux09-catalog-actions">
+      <button class="ux-secondary-button" id="catalog-save" type="button">Save selection</button>
+      <button class="ux-primary-button" id="catalog-update" type="button">Apply changes &amp; update hosts</button>
+      <button class="ux-secondary-button" id="catalog-view-log" type="button">View update log</button>
     </div>
   </section>
-  <md-dialog id="catalog-confirm-dialog">
-    <div slot="headline" id="catalog-confirm-title">Confirm change</div>
-    <div slot="content" id="catalog-confirm-body"></div>
-    <div slot="actions">
-      <md-text-button id="catalog-cancel">Cancel</md-text-button>
-      <md-text-button id="catalog-confirm">Confirm</md-text-button>
+  <div class="ux09-tabs" role="tablist" aria-label="Sources sections">
+    <button type="button" role="tab" id="ux09-tab-presets" aria-selected="true">Presets</button>
+    <button type="button" role="tab" id="ux09-tab-mine" aria-selected="false">My sources</button>
+    <button type="button" role="tab" id="ux09-tab-advanced" aria-selected="false">Advanced</button>
+  </div>
+  <section id="ux09-presets" role="tabpanel" aria-labelledby="ux09-tab-presets">
+    <h2>Balanced baseline</h2><div id="ux09-core" class="ux09-preset-grid"></div>
+    <h2>Comprehensive</h2><div id="ux09-comprehensive" class="ux09-preset-grid"></div>
+    <h2>Energized — one tier at a time</h2>
+    <p class="ux-small">Spark, Blu and Ultimate are mutually exclusive within the catalog. You can select none.</p>
+    <div id="ux09-energized" class="ux09-preset-grid"></div>
+    <p class="ux-small">Large lists may heavily overlap. All blocked domains are deduplicated when hosts are rebuilt. Publisher URLs are independently maintained.</p>
+  </section>
+  <section id="ux09-mine" role="tabpanel" aria-labelledby="ux09-tab-mine" hidden>
+    <div class="ux-card"><h2>My subscriptions</h2>
+      <p class="ux-small">Custom URLs remain yours. Toggle them individually or open Rules to add, remove or edit sources.</p>
+      <div id="ux09-manual-list">Loading…</div>
+      <button type="button" class="ux-secondary-button" id="ux09-open-rules">Open Rules editor</button>
     </div>
-  </md-dialog>
+  </section>
+  <section id="ux09-advanced" role="tabpanel" aria-labelledby="ux09-tab-advanced" hidden>
+    <div class="ux-card"><h2>How sources are processed</h2>
+      <p>All enabled sources are fetched over HTTPS, parsed, deduplicated, then checked against allowlists before a journaled hosts commit. A repeated exact source URL is downloaded only once per list category.</p>
+      <p class="ux-small">The terminal displays measured entries, duplicate counts, allowlist exclusions, and actual download events. Changes pending means your saved configuration differs from the last successfully applied source set.</p>
+      <button type="button" class="ux-secondary-button" id="ux09-open-more">Blocked-page response settings</button>
+    </div>
+  </section>
 </div>
