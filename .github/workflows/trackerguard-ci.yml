@@ -26,6 +26,7 @@ jobs:
           sh -n module/source_catalog_batch_ux09.sh
           python3 tests/test_hosts_ux09.py
           python3 tests/test_hosts_update_ux09.py
+          python3 tests/test_ux09e_acceptance.py
           python3 tests/test_hosts_controls_ux08.py
           sh -n module/response_mode.sh
           sh -n module/hosts_reset_safe.sh
