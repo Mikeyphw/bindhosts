@@ -70,7 +70,7 @@ class P05Source(unittest.TestCase):
     def test_explicit_ci_policy(self):
         policy=json.loads((ROOT/'ci/bh-app01-required-workflows.json').read_text())
         self.assertEqual(policy['schema'],'bh-app01/ci-policy/v1')
-        self.assertEqual(policy['required_workflows'],['bh-app01-foundation.yml','bindhosts-ux-ci.yml','trackerguard-ci.yml'])
+        self.assertEqual(policy['required_workflows'],['bh-app01-foundation.yml','bh-app01-p07-api36.yml','bindhosts-ux-ci.yml','trackerguard-ci.yml'])
         self.assertNotEqual(policy['ci_qualification'],policy['release_qualification'])
 
     def test_android_ci_has_gates(self):

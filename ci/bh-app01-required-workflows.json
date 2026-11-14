@@ -4,6 +4,7 @@
   "branch": "feature/bh-app01-p00-p03-companion-foundation-20261114",
   "required_workflows": [
     "bh-app01-foundation.yml",
+    "bh-app01-p07-api36.yml",
     "bindhosts-ux-ci.yml",
     "trackerguard-ci.yml"
   ],

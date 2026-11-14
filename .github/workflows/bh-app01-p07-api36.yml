@@ -1,0 +1,88 @@
+name: BH-APP01 P07 Hosted API36 UI Acceptance
+on:
+  pull_request:
+    paths:
+      - 'android/companion/**'
+      - 'webui/**'
+      - 'module/companion_*'
+      - 'scripts/ci/bh_app01_p07_*'
+      - 'tests/test_bh_app01_*'
+      - '.github/workflows/bh-app01-p07-api36.yml'
+      - 'ci/bh-app01-required-workflows.json'
+  push:
+    branches:
+      - 'feature/bh-app01-*'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: bh-app01-p07-${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: false
+jobs:
+  api36-ui:
+    name: Disposable API36 UI, root-denial and QS confirmation
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Require exact branch commit, not an implicit PR merge commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Build exact UX10 offline asset bundle and verify imports
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --global pnpm@11.22.0
+          pnpm --dir webui install --frozen-lockfile
+          pnpm --dir webui exec vite build --config vite.companion.config.js
+          python3 scripts/ci/bh_app01_p04_bundle_check.py
+      - name: Install API36 Android SDK
+        shell: bash
+        run: bash scripts/ci/bh_app01_android_sdk.sh
+      - name: Enable KVM for hosted disposable Android emulator
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-bh-app01-kvm.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Real API36 emulator UI tests (disposable, never physical-device writes)
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: bash scripts/ci/bh_app01_p07_emulator.sh
+      - name: Fail-closed source-pinned hosted receipt
+        shell: bash
+        run: |
+          python3 scripts/ci/bh_app01_p07_signoff.py \
+            --evidence android/companion/p07-evidence \
+            --expected-sha "$SOURCE_SHA"
+      - name: Upload hosted UI evidence (not physical-device or release qualification)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bh-app01-p07-api36-${{ env.SOURCE_SHA }}
+          path: android/companion/p07-evidence/
+          if-no-files-found: warn
+          retention-days: 30
