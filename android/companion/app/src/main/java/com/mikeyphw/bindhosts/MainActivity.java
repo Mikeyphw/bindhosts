@@ -93,12 +93,12 @@ public final class MainActivity extends Activity {
                 JSONObject request = new JSONObject(data);
                 id = request.getString("id");
                 op = request.getString("op");
-                management = RootRunner.isManagementOperation(op);
+                management = RootRunner.isManagementOperation(op) || "read-page".equals(op);
                 if (!id.matches("bh[a-z0-9]{1,16}")) return;
                 if (management) {
                     if (request.length() != 3 || !request.has("arg")) return;
                     argument = request.getString("arg");
-                    if (!RootRunner.validManagementArgument(argument)) return;
+                    if (!("read-page".equals(op) ? RootRunner.validPageArgument(argument) : RootRunner.validManagementArgument(argument))) return;
                 } else {
                     if (request.length() != 2 || (!"hello".equals(op) && !"status".equals(op) &&
                             !"pause".equals(op) && !"resume".equals(op) &&
@@ -111,7 +111,8 @@ public final class MainActivity extends Activity {
                 try {
                     response.put("id", id);
                     response.put("ok", true);
-                    response.put("value", management ? RootRunner.manage(op, argument) :
+                    response.put("value", "read-page".equals(op) ? RootRunner.page(argument) :
+                            management ? RootRunner.manage(op, argument) :
                             (("hello".equals(op) || "status".equals(op))
                             ? RootRunner.read(op) : RootRunner.control(op)));
                 } catch (Exception denied) {

@@ -1,0 +1,15 @@
+{
+  "schema": "bh-app01/v4-paginated-read",
+  "api_version": 4,
+  "operation": "read-page",
+  "read_only": true,
+  "sources": ["config-read", "config-list", "catalog", "tracker", "packages"],
+  "page_size_bytes": 3072,
+  "max_snapshot_bytes": 262144,
+  "max_pages": 86,
+  "consistency": "sha256 fingerprint checked on every page; reconstructed bytes independently hashed by WebView",
+  "request_fields": ["source", "selector", "offset", "expected_sha256"],
+  "response_fields": ["api", "action", "source", "selector", "offset", "next", "size", "sha256", "encoded"],
+  "writes": "v3 only; read-page never dispatches write verbs",
+  "privacy": "only decoded output reaches local same-origin WebUI; no diagnostics of raw payloads"
+}

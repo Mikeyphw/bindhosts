@@ -11,6 +11,7 @@ final class RootRunner {
     private static final String READ_SCRIPT = "/data/adb/modules/bindhosts/companion_api.sh";
     private static final String CONTROL_SCRIPT = "/data/adb/modules/bindhosts/companion_control_v2.sh";
     private static final String MANAGE_SCRIPT = "/data/adb/modules/bindhosts/companion_manage_v3.sh";
+    private static final String PAGE_SCRIPT = "/data/adb/modules/bindhosts/companion_read_v4.sh";
 
     static JSONObject read(String action) throws Exception {
         if (!"hello".equals(action) && !"status".equals(action))
@@ -89,6 +90,43 @@ final class RootRunner {
         if (output.length() > 6500 || !output.matches("(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?"))
             throw new IllegalStateException("Unsafe v3 response");
         return result;
+    }
+
+    static boolean validPageArgument(String arg) {
+        return arg != null && arg.length() >= 12 && arg.length() <= 480 &&
+                arg.matches("(?:config-read|config-list|catalog|tracker|packages)\\|[A-Za-z0-9_.~-]{1,110}\\|[0-9]{1,6}\\|(?:none|[0-9a-f]{64})")
+                && !arg.contains("..");
+    }
+
+    static JSONObject page(String arg) throws Exception {
+        if (!validPageArgument(arg)) throw new SecurityException("Unsupported paged read request");
+        String encodedArg = android.util.Base64.encodeToString(
+                arg.getBytes(StandardCharsets.US_ASCII), android.util.Base64.NO_WRAP);
+        JSONObject body = call(PAGE_SCRIPT, encodedArg);
+        if (body.length() != 9 || body.getInt("api") != 4 || !"read-page".equals(body.getString("action")))
+            throw new IllegalStateException("Incompatible paged-read API");
+        String[] parts = arg.split("\\|", -1);
+        if (!parts[0].equals(body.getString("source")) || !parts[1].equals(body.getString("selector")) ||
+                Long.parseLong(parts[2]) != body.getLong("offset"))
+            throw new IllegalStateException("Paged read identity mismatch");
+        long size = body.getLong("size"), offset = body.getLong("offset");
+        if (size < 0 || size > 262144 || offset < 0 || offset > size)
+            throw new IllegalStateException("Invalid paged-read bounds");
+        String hash = body.getString("sha256");
+        if (!hash.matches("[0-9a-f]{64}") || (!"none".equals(parts[3]) && !hash.equals(parts[3])))
+            throw new IllegalStateException("Paged read fingerprint mismatch");
+        String encoded = body.getString("encoded");
+        if (encoded.length() > 4096 || !encoded.matches("(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?"))
+            throw new IllegalStateException("Invalid paged-read base64");
+        int count = android.util.Base64.decode(encoded, android.util.Base64.DEFAULT).length;
+        if (count > 3072 || count != Math.min(3072L, size-offset))
+            throw new IllegalStateException("Paged-read byte count mismatch");
+        if (body.isNull("next")) {
+            if (offset+count != size) throw new IllegalStateException("Incomplete final page");
+        } else if (body.getLong("next") != offset+count || offset+count >= size) {
+            throw new IllegalStateException("Invalid next page");
+        }
+        return body;
     }
 
     private static void state(String value) {

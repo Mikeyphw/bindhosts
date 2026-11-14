@@ -5,9 +5,11 @@ on:
       - 'contracts/bh-app01-v1.json'
       - 'contracts/bh-app01-v2.json'
       - 'contracts/bh-app01-v3.json'
+      - 'contracts/bh-app01-v4.json'
       - 'module/companion_api.sh'
       - 'module/companion_control_v2.sh'
       - 'module/companion_manage_v3.sh'
+      - 'module/companion_read_v4.sh'
       - 'webui/runtime/companion_transport.mjs'
       - 'webui/vite.companion.config.js'
       - 'webui/runtime/companion_kernelsu_alt.mjs'
@@ -33,6 +35,7 @@ jobs:
           sh -n module/companion_api.sh
           sh -n module/companion_control_v2.sh
           sh -n module/companion_manage_v3.sh
+          sh -n module/companion_read_v4.sh
           python3 -m unittest discover -s tests -p 'test_bh_app01_*.py' -v
           node --check webui/runtime/companion_transport.mjs
           node --check android/companion/app/src/main/assets/app.js
@@ -43,9 +46,11 @@ jobs:
           node tests/test_bh_app01_p04_runtime.mjs
           node tests/test_bh_app01_p05_runtime.mjs
           node tests/test_bh_app01_p04b_runtime.mjs
+          node tests/test_bh_app01_p04b_pagination.mjs
           python3 -m json.tool contracts/bh-app01-v1.json >/dev/null
           python3 -m json.tool contracts/bh-app01-v2.json >/dev/null
           python3 -m json.tool contracts/bh-app01-v3.json >/dev/null
+          python3 -m json.tool contracts/bh-app01-v4.json >/dev/null
       - name: Check contract and no native shell execution from WebUI
         run: |
           python3 - <<'PY'

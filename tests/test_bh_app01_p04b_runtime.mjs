@@ -1,10 +1,23 @@
 import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
 import {exec, managementCommand} from '../webui/runtime/companion_kernelsu_alt.mjs';
 import {nativeAppTransport,validateReply} from '../webui/runtime/companion_transport.mjs';
 const mod='/data/adb/modules/bindhosts';
 const sample='BH_UX09_BATCH_APPLIED';
 const calls=[];
-globalThis.window={BindhostsBridge:{postMessage(raw){const req=JSON.parse(raw);calls.push(req);this.onmessage({data:JSON.stringify({id:req.id,ok:true,value:{api:3,action:req.op,encoded:Buffer.from(sample).toString('base64')}})});}}};
+globalThis.window={BindhostsBridge:{postMessage(raw){
+  const req=JSON.parse(raw);calls.push(req);
+  let value={api:3,action:req.op,encoded:Buffer.from(sample).toString('base64')};
+  if(req.op==='read-page') {
+    const [source,selector,offset,expected]=req.arg.split('|');
+    const digest=createHash('sha256').update(sample).digest('hex');
+    assert.equal(Number(offset),0);
+    assert(expected==='none'||expected===digest);
+    value={api:4,action:'read-page',source,selector,offset:0,next:null,
+      size:Buffer.byteLength(sample),sha256:digest,encoded:Buffer.from(sample).toString('base64')};
+  }
+  this.onmessage({data:JSON.stringify({id:req.id,ok:true,value})});
+}}};
 for(const [command,op,arg] of [
   [`sh ${mod}/source_catalog.sh status`,'catalog','status'],
   [`sh ${mod}/source_catalog_batch_ux09.sh batch adaway,energized-basic`,'catalog','batch|adaway,energized-basic'],

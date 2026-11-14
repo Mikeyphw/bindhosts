@@ -97,6 +97,59 @@ export function managementCommand(command) {
   return null;
 }
 
+// P04B P02: SHA-256 pinned bounded snapshot paging for read-only UX10 commands.
+// Never paginate writes: v3 retains fixed receipts and explicit transaction gates.
+const PAGED_READS = new Set(['config-read','config-list','packages']);
+function pagedSelector(op,arg) {
+  if (PAGED_READS.has(op)) return arg;
+  if (op==='catalog' && ['status','applied-status','manual-list'].includes(arg)) return arg;
+  if (op==='tracker' && ['status','rules'].includes(arg)) return arg;
+  if (op==='tracker' && arg.startsWith('preview|')) {
+    const pkg=arg.slice(8);
+    if (packageName.test(pkg)) return 'preview~'+pkg;
+  }
+  return null;
+}
+function decodePage(encoded) {
+  const binary=atob(encoded);
+  if (binary.length>3072) throw new Error('Read page exceeds bound');
+  return Uint8Array.from(binary,c=>c.charCodeAt(0));
+}
+export async function readPaginated(op,selector) {
+  if (!['config-read','config-list','catalog','tracker','packages'].includes(op) ||
+      typeof selector!=='string' || !/^[A-Za-z0-9_.~-]{1,110}$/.test(selector) || selector.includes('..'))
+    throw new Error('Unqualified paged-read source');
+  let cursor=0, hash='none', size=-1;
+  const pages=[];
+  for (let round=0;round<87;round++) {
+    const response=await native().invoke('read-page',`${op}|${selector}|${cursor}|${hash}`);
+    if (response.source!==op || response.selector!==selector || response.offset!==cursor)
+      throw new Error('Page source mismatch');
+    if (hash!=='none' && hash!==response.sha256) throw new Error('Snapshot drift');
+    if (size!==-1 && size!==response.size) throw new Error('Snapshot size drift');
+    hash=response.sha256; size=response.size;
+    const chunk=decodePage(response.encoded);
+    if (chunk.length!==Math.min(3072,size-cursor)) throw new Error('Page byte count mismatch');
+    if (response.next!==null && response.next!==cursor+chunk.length)
+      throw new Error('Noncontiguous read page');
+    if (response.next===null && cursor+chunk.length!==size)
+      throw new Error('Premature end of snapshot');
+    pages.push(chunk);
+    cursor+=chunk.length;
+    if (response.next===null) {
+      const all=new Uint8Array(size);let offset=0;
+      for(const b of pages){all.set(b,offset);offset+=b.length;}
+      if (!globalThis.crypto?.subtle) throw new Error('Missing SHA-256 verifier');
+      const actual=Array.from(new Uint8Array(await globalThis.crypto.subtle.digest('SHA-256',all)))
+        .map(x=>x.toString(16).padStart(2,'0')).join('');
+      if(actual!==hash) throw new Error('Corrupted native read');
+      return new TextDecoder('utf-8',{fatal:true}).decode(all);
+    }
+    if (cursor>=size) throw new Error('Invalid paged continuation');
+  }
+  throw new Error('Read exceeds page-count bound');
+}
+
 export async function exec(command) {
   if (typeof command !== 'string') return refused();
   try {
@@ -132,6 +185,8 @@ export async function exec(command) {
     // through the v3 validated native boundary, never executed as shell text.
     const management = managementCommand(command);
     if (management) {
+      const selector=pagedSelector(management.op,management.arg);
+      if(selector!==null) return success(await readPaginated(management.op,selector));
       const response = await native().invoke(management.op, management.arg);
       return success(decodeManagementResponse(response.encoded));
     }
