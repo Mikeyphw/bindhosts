@@ -51,11 +51,13 @@ jobs:
           node tests/test_bh_app01_p04b_runtime.mjs
           node tests/test_bh_app01_p04b_pagination.mjs
           node tests/test_bh_app01_p04b_more.mjs
+          node tests/test_bh_app01_p06_picker.mjs
           python3 -m json.tool contracts/bh-app01-v1.json >/dev/null
           python3 -m json.tool contracts/bh-app01-v2.json >/dev/null
           python3 -m json.tool contracts/bh-app01-v3.json >/dev/null
           python3 -m json.tool contracts/bh-app01-v4.json >/dev/null
           python3 -m json.tool contracts/bh-app01-v5.json >/dev/null
+          python3 -m json.tool contracts/bh-app01-v6.json >/dev/null
       - name: Check contract and no native shell execution from WebUI
         run: |
           python3 - <<'PY'

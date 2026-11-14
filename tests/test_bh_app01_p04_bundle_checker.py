@@ -18,7 +18,7 @@ class BundleChecker(unittest.TestCase):
         <button page="home"></button><button page="hosts"></button>
         <button page="apps"></button><button page="more"></button>'''
         (dest/'index.html').write_text(html+' '*2200)
-        (dest/'assets/main.js').write_text('/* bundled UX10 */\n'+'x'*51000)
+        (dest/'assets/main.js').write_text('/* bundled UX10 */\n'+'__bhCompanionPickText '+'x'*51000+' __bhCompanionPickText')
         (dest/'icon.png').write_bytes(b'fake-icon')
         (dest/'locales/strings/en.xml').write_text('<resources/>')
         (dest/'.vite/manifest.json').write_text(json.dumps({'index.html':{'file':'assets/main.js'}}))
@@ -47,6 +47,15 @@ class BundleChecker(unittest.TestCase):
             result=self.check(tmp)
             self.assertNotEqual(result.returncode,0)
             self.assertIn('localizations not bundled',result.stderr)
+
+    def test_missing_p06_native_picker_rejects(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            dest=self.fixture(tmp)
+            f=dest/'assets/main.js'
+            f.write_text(f.read_text().replace('__bhCompanionPickText','BROKEN_PICKER'))
+            res=self.check(tmp)
+            self.assertNotEqual(res.returncode,0)
+            self.assertIn('SAF picker bridge',res.stderr)
 
     def test_missing_js_or_dangling_manifest_refuse(self):
         with tempfile.TemporaryDirectory() as tmp:

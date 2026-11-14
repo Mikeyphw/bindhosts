@@ -250,3 +250,16 @@ export function toast(message) {
 export function spawn() { throw new Error('BH_APP01_P05_REFUSED: arbitrary streaming commands disabled'); }
 export const P04_COMMANDS = Object.freeze([HOSTS_READ, MODULE_PROP_READ]);
 export const P05_COMMANDS = Object.freeze([PAUSE, RESUME, UPDATE_START, UPDATE_STATUS, UPDATE_EVENTS]);
+
+// P06: SAF document selection, never arbitrary shell-file browsing. Only the
+// Android companion provides this entry point; the KernelSU build is unchanged.
+export async function pickCompanionTextFile() {
+  const receipt = await native().invoke('pick-text');
+  return receipt.path;
+}
+if (typeof window !== 'undefined' && window.BindhostsBridge) {
+  Object.defineProperty(window, '__bhCompanionPickText', {
+    configurable: false, writable: false, enumerable: false,
+    value: pickCompanionTextFile,
+  });
+}

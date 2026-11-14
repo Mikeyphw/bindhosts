@@ -1,0 +1,21 @@
+{
+  "schema": "bh-app01/v6",
+  "api_version": 6,
+  "allowed_operations": ["pick-text"],
+  "user_action_required": "Android ACTION_OPEN_DOCUMENT chooser; cancellation is a refusal, not an empty import",
+  "native_reply_fields": ["api", "action", "path"],
+  "native_storage": "App-specific external cache/imports; never a provider path, URI, or arbitrary root read",
+  "file_requirements": {
+    "extension": ".txt",
+    "max_bytes": 2097152,
+    "content": "printable ASCII and newline only; no NUL, CR, tab or binary control bytes",
+    "basename": "1-64 ASCII-safe basename characters followed by .txt",
+    "stale_cleanup": "only known app-owned staged files older than 60 minutes",
+    "max_staged_files": 32
+  },
+  "root_write": "Existing UX02 hosts_config_safe.sh import-custom; source path encoded as data and validated by root",
+  "arbitrary_shell_supported": false,
+  "network_access_supported": false,
+  "original_webui_build_changed": false,
+  "device_acceptance_required": ["Android 16 SAF selection", "import read-back", "cancel", "rotation", "keyboard", "root refusal", "Back/navigation", "Quick Settings resume"]
+}

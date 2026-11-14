@@ -2,10 +2,12 @@
 // The normal Vite configuration remains unchanged for KernelSU/WebUI-X.
 import { defineConfig } from 'vite';
 import { fileURLToPath } from 'node:url';
+import { companionSafPickerPlugin } from './runtime/companion_saf_picker.mjs';
 
 const local = path => fileURLToPath(new URL(path, import.meta.url));
 export default defineConfig({
   base: './',
+  plugins: [companionSafPickerPlugin()],
   resolve: {
     alias: [
       { find: /^kernelsu-alt$/, replacement: local('./runtime/companion_kernelsu_alt.mjs') },

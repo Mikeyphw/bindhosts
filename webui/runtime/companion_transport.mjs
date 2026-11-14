@@ -6,7 +6,8 @@ const MANAGEMENT_ACTIONS = new Set(['config-read','config-list','config-write','
 const MORE_ACTIONS = new Set(['backup','diagnostics','response']);
 const PAGE_SOURCES = new Set([...MANAGEMENT_ACTIONS, ...MORE_ACTIONS]);
 const PAGE_ACTION = 'read-page';
-const NATIVE_ACTIONS = new Set([...READ_ACTIONS, 'pause','resume','update-start','update-status','update-events', PAGE_ACTION, ...MANAGEMENT_ACTIONS, ...MORE_ACTIONS]);
+const PICK_ACTION = 'pick-text';
+const NATIVE_ACTIONS = new Set([...READ_ACTIONS, 'pause','resume','update-start','update-status','update-events', PAGE_ACTION, ...MANAGEMENT_ACTIONS, ...MORE_ACTIONS, PICK_ACTION]);
 const HOSTS = new Set(['ACTIVE', 'PAUSED', 'INACTIVE', 'DISABLED']);
 const OPERATION = new Set(['IDLE', 'RUNNING', 'DONE', 'FAILED', 'INTERRUPTED']);
 const STEPS = new Set(['NONE','PREPARING','DOWNLOADING','PARSED','SKIPPED_DUPLICATE_URL','DEDUPLICATING','ALLOWLIST','GENERATING','COMMITTING','DONE','UNCHANGED','FAILED','STATS']);
@@ -25,6 +26,12 @@ export function validateReply(name, body) {
     } else if (!HOSTS.has(body.hosts) || !OPERATION.has(body.operation)) {
       throw new Error('Invalid backend state');
     }
+  } else if (name === PICK_ACTION) {
+    if (body.api !== 6 || body.action !== PICK_ACTION ||
+        Object.keys(body).sort().join(',') !== 'action,api,path' ||
+        typeof body.path !== 'string' ||
+        !/^\/storage\/emulated\/0\/Android\/data\/com\.mikeyphw\.bindhosts\/cache\/imports\/bh-pick-[0-9a-f]{12}-[A-Za-z0-9_][A-Za-z0-9_.-]{0,63}\.txt$/.test(body.path) ||
+        body.path.includes('..')) throw new Error('Invalid SAF import receipt');
   } else if (name === PAGE_ACTION) {
     if (body.api !== 4 || body.action !== PAGE_ACTION ||
         Object.keys(body).sort().join(',') !== 'action,api,encoded,next,offset,selector,sha256,size,source' ||

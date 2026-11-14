@@ -24,11 +24,15 @@ def verify(root: Path) -> None:
     # Manifest files must exist inside Android assets and be nontrivial.
     js = list(output.rglob('*.js'))
     assert js and sum(p.stat().st_size for p in js) > 50_000, 'UX10 JS bundle missing'
+    # P06: both the fixed native adapter and the transformed UX10 file selector
+    # must survive minification in the *actual* Android-only bundle.
+    picker_hooks = sum(f.read_text(encoding='utf-8', errors='replace').count('__bhCompanionPickText') for f in js)
+    assert picker_hooks >= 2, 'P06 SAF picker bridge or transformed FileSelector missing from bundle'
     for entry in entries.values():
         target = entry.get('file')
         if target:
             assert (output / target).is_file(), f'missing Vite asset {target}'
-    print(f'BH_APP01_P04_UX10_BUNDLE_PASS pages=home,hosts,apps,more js_files={len(js)}')
+    print(f'BH_APP01_P04_UX10_BUNDLE_PASS pages=home,hosts,apps,more js_files={len(js)} p06_saf_hooks={picker_hooks}')
 
 if __name__ == '__main__':
     parser=argparse.ArgumentParser()
