@@ -146,6 +146,11 @@ window.replaceSpaces = function(input) {
 }
 
 window.wx?.on(window, 'back', () => {
+    // UX10: close touch overlays before navigation or history.
+    const ux10Dialog = document.getElementById('ux09-operation-confirm');
+    if (ux10Dialog && !ux10Dialog.hidden) { document.getElementById('ux09-operation-confirm-no')?.click(); return; }
+    const ux10Terminal = document.getElementById('ux09-operation-overlay');
+    if (ux10Terminal && !ux10Terminal.hidden) { document.getElementById('ux09-operation-close')?.click(); return; }
     if (hasManagedHistoryLayer()) {
         closeTopManagedLayer();
         return;
@@ -154,6 +159,11 @@ window.wx?.on(window, 'back', () => {
     const backBtn = document.querySelector('.back-button');
     if (backBtn && backBtn.classList.contains('show')) {
         backBtn.click();
+        return;
+    }
+    // UX10: a nested Sources screen must return to its parent on Android Back.
+    if (router.currentView === 'catalog') {
+        router.navigate('hosts');
         return;
     }
     // Back to home page

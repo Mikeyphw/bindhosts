@@ -193,6 +193,14 @@ TG_R1_MODDIR=${TG_R1_MODDIR:-/data/adb/modules/bindhosts}
 
 check_root
 _cmd=${1:-help}; [ "$#" -eq 0 ] || shift
+# Update the module manager's configured-IFW-block count after write actions.
+# Does not claim individual tracker network/runtime events were observed.
+case "$_cmd" in
+  block|add|remove|restore|apply|enroll|unenroll|exclude|include|reconcile)
+    trap 'sh "$TG_R1_MODDIR/dynamic_description_ux10.sh" refresh >/dev/null 2>&1 || :' EXIT ;;
+  monitor)
+    case "${1:-}" in once) trap 'sh "$TG_R1_MODDIR/dynamic_description_ux10.sh" refresh >/dev/null 2>&1 || :' EXIT ;; esac ;;
+esac
 case "$_cmd" in
   help|-h|--help) usage; tg_r2_usage ;;
   status) status ;;

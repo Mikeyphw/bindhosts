@@ -39,6 +39,17 @@ class Router {
      */
     navigate(name) {
         if (this.currentView === name) return;
+        // A pending source choice is never silently discarded by Back or bottom navigation.
+        if (this.currentView === 'catalog' && !this.ux10LeaveApproved && catalogModule.hasPendingSourceChanges()) {
+            if (this.ux10ExitPending) return;
+            this.ux10ExitPending = true;
+            void catalogModule.approveSourceExit().then(approved => {
+                if (!approved) return;
+                this.ux10LeaveApproved = true;
+                try { this.navigate(name); } finally { this.ux10LeaveApproved = false; }
+            }).catch(() => {}).finally(() => { this.ux10ExitPending = false; });
+            return;
+        }
 
         // Cleanup before transition
         document.querySelector('.back-button')?.click();
@@ -119,7 +130,7 @@ class Router {
 
     updateFooter(name) {
         document.querySelectorAll('.bottom-bar-item').forEach(item => {
-            const isTarget = item.getAttribute('page') === (name === 'activity' ? 'more' : name);
+            const isTarget = item.getAttribute('page') === (name === 'activity' ? 'more' : name === 'catalog' ? 'hosts' : name);
             
             if (isTarget) {
                 item.setAttribute('selected', '');

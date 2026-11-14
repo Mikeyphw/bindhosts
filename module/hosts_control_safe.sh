@@ -69,6 +69,7 @@ case "$ACTION" in
       sed -i "s/^description=.*/$DESCRIPTION/" "$MODDIR/module.prop" ||
         echo 'BH_HOSTS_WARNING: module description could not be refreshed' >&2
     fi
+    sh "$MODDIR/dynamic_description_ux10.sh" refresh >/dev/null 2>&1 || :
     if [ "$ACTION" = pause ]; then printf 'BH_HOSTS_PAUSE_PASS\n'; else printf 'BH_HOSTS_RESUME_PASS\n'; fi
     ;;
   update)

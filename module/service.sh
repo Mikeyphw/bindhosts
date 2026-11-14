@@ -194,13 +194,14 @@ fi
 # do not bother updating if generated string is the same
 desc_current=$(grep "^description=" "$MODDIR/module.prop")
 if [ "$desc_current" = "$string" ]; then
-	# echo "bindhosts: same shit. skip update" >> /dev/kmsg
-	return
+    sh "$MODDIR/dynamic_description_ux10.sh" refresh >/dev/null 2>&1 || :
+    return
 fi
 
 cat "$MODDIR/module.prop" > "$MODDIR/module.prop.tmp"
 busybox sed -i "s/^description=.*/$string/g" "$MODDIR/module.prop.tmp"
 busybox mv -f "$MODDIR/module.prop.tmp" "$MODDIR/module.prop"
+sh "$MODDIR/dynamic_description_ux10.sh" refresh >/dev/null 2>&1 || :
 } # apply_description
 
 # UX06: restore any interrupted configuration bundle before other services start.

@@ -338,7 +338,8 @@ async function updateTrackerSummary() {
         const result = await exec(`sh ${moduleDirectory}/bindhosts.sh tracker json status`);
         if (result.errno !== 0) throw new Error('TrackerGuard status unavailable');
         const state = JSON.parse(result.stdout);
-        target.textContent = `${state.total_rules} IFW rules · ${state.enrolled.length} enrolled apps · Monitor ${state.monitor_enabled ? 'on' : 'off'}`;
+        if (!Number.isSafeInteger(state.total_rules) || state.total_rules < 0 || !Array.isArray(state.enrolled)) throw new Error('Unrecognized tracker count');
+        target.textContent = `${state.total_rules} configured app tracker blocks (IFW rules) · ${state.enrolled.length} enrolled apps · Monitor ${state.monitor_enabled ? 'on' : 'off'}`;
     } catch {
         target.textContent = 'TrackerGuard status unavailable. Check your installed module version.';
     }

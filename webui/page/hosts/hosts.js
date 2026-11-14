@@ -1,4 +1,5 @@
 import { escapeHtml } from '../../utils/safe_text.js';
+import { router } from '../../route.js';
 import { secureAdd, secureRemove, secureToggle, secureReplaceLine, secureDeleteCustom,
          secureRenameCustom, secureImportCustom, secureFileSize, secureSaveFile } from '../../utils/hosts_secure_io.js';
 import { exec } from 'kernelsu-alt';
@@ -716,6 +717,7 @@ export function mount() {
 
     // Explicit pause/resume/update; never call the legacy checksum-driven toggle.
     mountHostsControls();
+    document.getElementById('ux10-manage-presets')?.addEventListener('click', () => router.navigate('catalog'));
     const importBtn = document.getElementById("import-custom-button");
     importBtn.onclick = () => importCustomHost();
 }
