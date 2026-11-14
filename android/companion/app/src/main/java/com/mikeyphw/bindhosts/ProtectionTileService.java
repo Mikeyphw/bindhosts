@@ -3,6 +3,8 @@ package com.mikeyphw.bindhosts;
 import android.app.PendingIntent;
 import android.content.Intent;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.service.quicksettings.Tile;
 import android.service.quicksettings.TileService;
 import org.json.JSONObject;
@@ -12,6 +14,7 @@ import java.util.concurrent.Executors;
 /** P03 status-only tile. Mutating toggle is intentionally deferred to P05. */
 public final class ProtectionTileService extends TileService {
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
     @Override public void onStartListening() {
         super.onStartListening();
         render(Tile.STATE_UNAVAILABLE, "Checking…");
@@ -30,7 +33,9 @@ public final class ProtectionTileService extends TileService {
             } catch (Exception ignored) { /* Never show stale success. */ }
             final int verified = state;
             final String label = subtitle;
-            runOnUiThread(() -> render(verified, label));
+            mainHandler.post(() -> {
+                if (!executor.isShutdown()) render(verified, label);
+            });
         });
     }
     private void render(int state, String subtitle) {
@@ -54,6 +59,7 @@ public final class ProtectionTileService extends TileService {
         }
     }
     @Override public void onDestroy() {
+        mainHandler.removeCallbacksAndMessages(null);
         executor.shutdownNow();
         super.onDestroy();
     }

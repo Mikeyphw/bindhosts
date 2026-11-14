@@ -23,6 +23,18 @@ class SourceContract(unittest.TestCase):
         self.assertNotIn('force-reset', tile)
         self.assertIn('STATE_UNAVAILABLE', tile)
 
+    def test_tile_ui_dispatch_uses_service_main_looper(self):
+        # TileService is a Service, not an Activity; runOnUiThread does not exist.
+        tile = (ROOT / 'android/companion/app/src/main/java/com/mikeyphw/bindhosts/ProtectionTileService.java').read_text()
+        self.assertIn('extends TileService', tile)
+        self.assertNotIn('runOnUiThread(', tile)
+        self.assertIn('import android.os.Handler;', tile)
+        self.assertIn('import android.os.Looper;', tile)
+        self.assertIn('new Handler(Looper.getMainLooper())', tile)
+        self.assertIn('mainHandler.post(', tile)
+        self.assertIn('mainHandler.removeCallbacksAndMessages(null)', tile)
+        self.assertIn('executor.isShutdown()', tile)
+
     def test_no_native_web_network_or_backup(self):
         manifest = (ROOT / 'android/companion/app/src/main/AndroidManifest.xml').read_text()
         html = (ROOT / 'android/companion/app/src/main/assets/index.html').read_text()
