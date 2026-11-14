@@ -16,7 +16,7 @@ const refused = () => Object.freeze({ errno: 13, stdout: '', stderr: 'BH_APP01_P
 function native() {
   if (!transport) {
     if (!window.BindhostsBridge || typeof window.BindhostsBridge.postMessage !== 'function') throw new Error('Native bridge unavailable');
-    transport = nativeAppTransport(window.BindhostsBridge);
+    transport = nativeAppTransport(window.BindhostsBridge, 30000);
   }
   return transport;
 }
@@ -100,6 +100,50 @@ export function managementCommand(command) {
 // P04B P02: SHA-256 pinned bounded snapshot paging for read-only UX10 commands.
 // Never paginate writes: v3 retains fixed receipts and explicit transaction gates.
 const PAGED_READS = new Set(['config-read','config-list','packages']);
+const BACKUP = `sh ${MOD}/config_backup_safe.sh `;
+const DIAGNOSTICS = `sh ${MOD}/ux05_diagnostics.sh `;
+const RESPONSE = `sh ${MOD}/bindhosts.sh --response `;
+const SNAPSHOT_ID = /^bh-[0-9]{8}T[0-9]{6}-[A-Za-z0-9]{6}$/;
+const ARCHIVE_NAME = /^bindhosts-backup-bh-[0-9]{8}T[0-9]{6}-[A-Za-z0-9]{6}\.tar$/;
+// This registry follows UX05/06/07 fixed verbs. The normal KernelSU WebUI
+// retains its own backend. No user value becomes an executable shell command.
+export function moreCommand(command) {
+  if (typeof command !== 'string') return null;
+  if (command.startsWith(BACKUP)) {
+    const args = command.slice(BACKUP.length).split(' ');
+    if (args.length === 1 && ['status','health','list','imports','create'].includes(args[0]))
+      return {op:'backup',arg:args[0]};
+    if (args.length === 2 && ['verify','preview','restore','export'].includes(args[0]) && SNAPSHOT_ID.test(args[1]))
+      return {op:'backup',arg:args[0]+'~'+args[1]};
+    if (args.length === 2 && args[0] === 'import' && ARCHIVE_NAME.test(args[1]))
+      return {op:'backup',arg:'import~'+args[1]};
+    return null;
+  }
+  if (command.startsWith(DIAGNOSTICS)) {
+    const args=command.slice(DIAGNOSTICS.length).split(' ');
+    if (args.length === 1 && ['status','export'].includes(args[0])) return {op:'diagnostics',arg:args[0]};
+    if (args.length === 2 && args[0] === 'history' && /^[1-9][0-9]?$|^100$/.test(args[1]))
+      return {op:'diagnostics',arg:'history~'+args[1]};
+    return null;
+  }
+  if (command.startsWith(RESPONSE)) {
+    const args=command.slice(RESPONSE.length).split(' ');
+    if (args.length === 1 && args[0] === 'status') return {op:'response',arg:'status'};
+    if (args.length === 2 && args[0] === 'set' && ['off','transparent','logo'].includes(args[1]))
+      return {op:'response',arg:'set~'+args[1]};
+    if (args.length === 2 && args[0] === 'https' &&
+        ['cert-create','cert-export','enable','disable','test'].includes(args[1]))
+      return {op:'response',arg:'https~'+args[1]};
+  }
+  return null;
+}
+function moreRead(op,arg) {
+  if (op==='backup' && (['status','health','list','imports'].includes(arg) ||
+      /^(verify|preview)~bh-[0-9]{8}T[0-9]{6}-[A-Za-z0-9]{6}$/.test(arg))) return arg;
+  if (op==='diagnostics' && (arg==='status' || /^history~(?:[1-9][0-9]?|100)$/.test(arg))) return arg;
+  if (op==='response' && arg==='status') return arg;
+  return null;
+}
 function pagedSelector(op,arg) {
   if (PAGED_READS.has(op)) return arg;
   if (op==='catalog' && ['status','applied-status','manual-list'].includes(arg)) return arg;
@@ -116,7 +160,7 @@ function decodePage(encoded) {
   return Uint8Array.from(binary,c=>c.charCodeAt(0));
 }
 export async function readPaginated(op,selector) {
-  if (!['config-read','config-list','catalog','tracker','packages'].includes(op) ||
+  if (!['config-read','config-list','catalog','tracker','packages','backup','diagnostics','response'].includes(op) ||
       typeof selector!=='string' || !/^[A-Za-z0-9_.~-]{1,110}$/.test(selector) || selector.includes('..'))
     throw new Error('Unqualified paged-read source');
   let cursor=0, hash='none', size=-1;
@@ -180,6 +224,13 @@ export async function exec(command) {
     if (command === UPDATE_EVENTS) {
       const result = await native().invoke('update-events');
       return success(eventsText(result.encoded));
+    }
+    const more = moreCommand(command);
+    if (more) {
+      const selector=moreRead(more.op,more.arg);
+      if (selector!==null) return success(await readPaginated(more.op,selector));
+      const result=await native().invoke(more.op,more.arg);
+      return success(decodeManagementResponse(result.encoded));
     }
     // P04B: only exact UX10 commands are mapped; arguments are passed as data
     // through the v3 validated native boundary, never executed as shell text.

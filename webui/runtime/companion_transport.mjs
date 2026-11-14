@@ -3,8 +3,10 @@
 // its own existing UX08/UX09 interfaces, not this Android adapter.
 const READ_ACTIONS = new Set(['hello', 'status']);
 const MANAGEMENT_ACTIONS = new Set(['config-read','config-list','config-write','catalog','tracker','packages']);
+const MORE_ACTIONS = new Set(['backup','diagnostics','response']);
+const PAGE_SOURCES = new Set([...MANAGEMENT_ACTIONS, ...MORE_ACTIONS]);
 const PAGE_ACTION = 'read-page';
-const NATIVE_ACTIONS = new Set([...READ_ACTIONS, 'pause','resume','update-start','update-status','update-events', PAGE_ACTION, ...MANAGEMENT_ACTIONS]);
+const NATIVE_ACTIONS = new Set([...READ_ACTIONS, 'pause','resume','update-start','update-status','update-events', PAGE_ACTION, ...MANAGEMENT_ACTIONS, ...MORE_ACTIONS]);
 const HOSTS = new Set(['ACTIVE', 'PAUSED', 'INACTIVE', 'DISABLED']);
 const OPERATION = new Set(['IDLE', 'RUNNING', 'DONE', 'FAILED', 'INTERRUPTED']);
 const STEPS = new Set(['NONE','PREPARING','DOWNLOADING','PARSED','SKIPPED_DUPLICATE_URL','DEDUPLICATING','ALLOWLIST','GENERATING','COMMITTING','DONE','UNCHANGED','FAILED','STATS']);
@@ -26,7 +28,7 @@ export function validateReply(name, body) {
   } else if (name === PAGE_ACTION) {
     if (body.api !== 4 || body.action !== PAGE_ACTION ||
         Object.keys(body).sort().join(',') !== 'action,api,encoded,next,offset,selector,sha256,size,source' ||
-        !MANAGEMENT_ACTIONS.has(body.source) || typeof body.selector !== 'string' ||
+        !PAGE_SOURCES.has(body.source) || typeof body.selector !== 'string' ||
         !/^[A-Za-z0-9_.~-]{1,110}$/.test(body.selector) || body.selector.includes('..') ||
         !Number.isSafeInteger(body.offset) || body.offset < 0 || body.offset > 262144 ||
         !Number.isSafeInteger(body.size) || body.size < 0 || body.size > 262144 || body.offset > body.size ||
@@ -35,6 +37,11 @@ export function validateReply(name, body) {
         typeof body.encoded !== 'string' || body.encoded.length > 4096 ||
         !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(body.encoded))
       throw new Error('Invalid paged-read reply');
+  } else if (MORE_ACTIONS.has(name)) {
+    if (body.api !== 5 || body.action !== name || Object.keys(body).sort().join(',') !== 'action,api,encoded' ||
+        typeof body.encoded !== 'string' || body.encoded.length > 5500 ||
+        !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(body.encoded))
+      throw new Error('Invalid More action reply');
   } else if (MANAGEMENT_ACTIONS.has(name)) {
     if (body.api !== 3 || body.action !== name || Object.keys(body).sort().join(',') !== 'action,api,encoded' ||
         typeof body.encoded !== 'string' || body.encoded.length > 6500 ||
@@ -74,7 +81,7 @@ export function kernelSuTransport(exec, moduleDirectory = '/data/adb/modules/bin
 // Prevent unqualified reads even before the separate rooted allowlist revalidates them.
 export function validPageRequest(arg) {
   if (typeof arg !== 'string' || arg.length > 480 || arg.includes('..')) return false;
-  const match=arg.match(/^(config-read|config-list|catalog|tracker|packages)\|([A-Za-z0-9_.~-]{1,110})\|([0-9]{1,6})\|(none|[0-9a-f]{64})$/);
+  const match=arg.match(/^(config-read|config-list|catalog|tracker|packages|backup|diagnostics|response)\|([A-Za-z0-9_.~-]{1,110})\|([0-9]{1,6})\|(none|[0-9a-f]{64})$/);
   if (!match || Number(match[3])>262144) return false;
   const [,source,selector]=match;
   switch(source) {
@@ -85,6 +92,10 @@ export function validPageRequest(arg) {
     case 'tracker': return ['status','rules'].includes(selector) ||
       /^preview~[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)+$/.test(selector);
     case 'packages': return selector==='user';
+    case 'backup': return ['status','health','list','imports'].includes(selector) ||
+      /^(verify|preview)~bh-[0-9]{8}T[0-9]{6}-[A-Za-z0-9]{6}$/.test(selector);
+    case 'diagnostics': return selector==='status' || /^history~(?:[1-9][0-9]?|100)$/.test(selector);
+    case 'response': return selector==='status';
     default: return false;
   }
 }
@@ -109,17 +120,21 @@ export function nativeAppTransport(bridge, timeoutMs = 8000) {
     invoke(name, arg) {
       operationName(name, NATIVE_ACTIONS);
       const page = name === PAGE_ACTION;
+      const more = MORE_ACTIONS.has(name);
       const management = MANAGEMENT_ACTIONS.has(name);
       if (page && !validPageRequest(arg)) throw new Error('Invalid paged-read arguments');
       if (management && (typeof arg !== 'string' || arg.length < 1 || arg.length > 13000 ||
           !/^[A-Za-z0-9_.+/=,|\-]+$/.test(arg) || arg.includes('..')))
         throw new Error('Invalid management arguments');
-      if (!management && !page && arg !== undefined) throw new Error('Unexpected management arguments');
+      if (more && (typeof arg !== 'string' || arg.length < 1 || arg.length > 160 ||
+          !/^[A-Za-z0-9_.~-]+$/.test(arg) || arg.includes('..')))
+        throw new Error('Invalid More arguments');
+      if (!management && !page && !more && arg !== undefined) throw new Error('Unexpected management arguments');
       const id = 'bh' + (++sequence).toString(36);
       return new Promise((resolve, reject) => {
         const timer = setTimeout(() => { pending.delete(id); reject(new Error('Native operation timed out')); }, timeoutMs);
         pending.set(id, {name, resolve, reject, timer});
-        try { bridge.postMessage(JSON.stringify(management || page ? {id, op:name, arg} : {id, op:name})); }
+        try { bridge.postMessage(JSON.stringify(management || page || more ? {id, op:name, arg} : {id, op:name})); }
         catch { clearTimeout(timer); pending.delete(id); reject(new Error('Native bridge unavailable')); }
       });
     }

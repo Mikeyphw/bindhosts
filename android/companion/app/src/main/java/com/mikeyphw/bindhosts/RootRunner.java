@@ -12,6 +12,7 @@ final class RootRunner {
     private static final String CONTROL_SCRIPT = "/data/adb/modules/bindhosts/companion_control_v2.sh";
     private static final String MANAGE_SCRIPT = "/data/adb/modules/bindhosts/companion_manage_v3.sh";
     private static final String PAGE_SCRIPT = "/data/adb/modules/bindhosts/companion_read_v4.sh";
+    private static final String MORE_SCRIPT = "/data/adb/modules/bindhosts/companion_more_v5.sh";
 
     static JSONObject read(String action) throws Exception {
         if (!"hello".equals(action) && !"status".equals(action))
@@ -92,9 +93,32 @@ final class RootRunner {
         return result;
     }
 
+    static boolean isMoreOperation(String op) {
+        return "backup".equals(op) || "diagnostics".equals(op) || "response".equals(op);
+    }
+
+    static boolean validMoreArgument(String arg) {
+        return arg != null && arg.length() >= 1 && arg.length() <= 160 &&
+                arg.matches("[A-Za-z0-9_.~\\-]+") && !arg.contains("..");
+    }
+
+    static JSONObject more(String op, String arg) throws Exception {
+        if (!isMoreOperation(op) || !validMoreArgument(arg))
+            throw new SecurityException("Unsupported More action");
+        String encodedArg = android.util.Base64.encodeToString(
+                arg.getBytes(StandardCharsets.US_ASCII), android.util.Base64.NO_WRAP);
+        JSONObject body = call(MORE_SCRIPT, op + " " + encodedArg);
+        if (body.length() != 3 || body.getInt("api") != 5 || !op.equals(body.getString("action")))
+            throw new IllegalStateException("Incompatible More response");
+        String encoded = body.getString("encoded");
+        if (encoded.length() > 5500 || !encoded.matches("(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?"))
+            throw new IllegalStateException("Invalid More receipt encoding");
+        return body;
+    }
+
     static boolean validPageArgument(String arg) {
         return arg != null && arg.length() >= 12 && arg.length() <= 480 &&
-                arg.matches("(?:config-read|config-list|catalog|tracker|packages)\\|[A-Za-z0-9_.~-]{1,110}\\|[0-9]{1,6}\\|(?:none|[0-9a-f]{64})")
+                arg.matches("(?:config-read|config-list|catalog|tracker|packages|backup|diagnostics|response)\\|[A-Za-z0-9_.~-]{1,110}\\|[0-9]{1,6}\\|(?:none|[0-9a-f]{64})")
                 && !arg.contains("..");
     }
 
@@ -147,7 +171,7 @@ final class RootRunner {
         Process process = new ProcessBuilder("su", "-c", "/system/bin/sh " + script + " " + verb)
                 .redirectErrorStream(false).start();
         try {
-            if (!process.waitFor(12, TimeUnit.SECONDS)) throw new IllegalStateException("Root command timed out");
+            if (!process.waitFor(25, TimeUnit.SECONDS)) throw new IllegalStateException("Root command timed out");
             if (process.exitValue() != 0) throw new IllegalStateException("Root, module or safe operation unavailable");
             ByteArrayOutputStream buffer = new ByteArrayOutputStream();
             try (InputStream in = process.getInputStream()) {

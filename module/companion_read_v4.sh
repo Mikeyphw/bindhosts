@@ -9,12 +9,16 @@ refuse() { printf 'BH_APP01_V4_REFUSED: %s\n' "$1" >&2; exit 2; }
 TOKEN=$1
 case "$TOKEN" in ''|*[!A-Za-z0-9+/=]*) refuse 'invalid request encoding' ;; esac
 [ "${#TOKEN}" -le 480 ] || refuse 'request too long'
+# Inspect raw decoded bytes before shell substitution can discard NUL/controls.
+CONTROL_BYTES=$(printf '%s' "$TOKEN" | base64 -d 2>/dev/null | LC_ALL=C tr -cd '\000-\037\177' | wc -c) || refuse 'invalid request bytes'
+case "$CONTROL_BYTES" in ''|*[!0-9]*) refuse 'invalid control-byte count' ;; esac
+[ "$CONTROL_BYTES" -eq 0 ] || refuse 'control characters in encoded input'
 REQUEST=$(printf '%s' "$TOKEN" | base64 -d 2>/dev/null) || refuse 'decode refused'
 case "$REQUEST" in *[!A-Za-z0-9_.~|=-]*|'') refuse 'invalid request charset' ;; esac
 OLDIFS=$IFS; IFS='|'; set -- $REQUEST; IFS=$OLDIFS
 [ "$#" -eq 4 ] || refuse 'expected source, selection, offset, digest'
 SOURCE=$1; SELECTOR=$2; OFFSET=$3; EXPECT=$4
-case "$SOURCE" in config-read|config-list|catalog|tracker|packages) : ;; *) refuse 'unsupported read source' ;; esac
+case "$SOURCE" in config-read|config-list|catalog|tracker|packages|backup|diagnostics|response) : ;; *) refuse 'unsupported read source' ;; esac
 case "$OFFSET" in ''|*[!0-9]*) refuse 'invalid page offset' ;; esac
 [ "${#OFFSET}" -le 6 ] || refuse 'invalid offset length'
 [ "$OFFSET" -le 262144 ] || refuse 'out-of-range page offset'
@@ -81,6 +85,32 @@ case "$SOURCE" in
   packages)
     [ "$SELECTOR" = user ] || refuse 'unsupported package inventory'
     pm list packages -3 > "$TMP" 2>/dev/null || refuse 'package read refused' ;;
+  backup)
+    require_backend config_backup_safe.sh
+    case "$SELECTOR" in
+      status|health|list|imports)
+        sh "$MODDIR/config_backup_safe.sh" "$SELECTOR" > "$TMP" 2>/dev/null || refuse 'backup read refused' ;;
+      verify~*|preview~*)
+        VERB=${SELECTOR%%~*}; SNAP=${SELECTOR#*~}
+        printf '%s' "$SNAP" | LC_ALL=C grep -Eq '^bh-[0-9]{8}T[0-9]{6}-[A-Za-z0-9]{6}$' || refuse 'invalid backup snapshot'
+        sh "$MODDIR/config_backup_safe.sh" "$VERB" "$SNAP" > "$TMP" 2>/dev/null || refuse 'backup verification refused' ;;
+      *) refuse 'unsupported backup read' ;;
+    esac ;;
+  diagnostics)
+    require_backend ux05_diagnostics.sh
+    case "$SELECTOR" in
+      status) sh "$MODDIR/ux05_diagnostics.sh" status > "$TMP" 2>/dev/null || refuse 'diagnostics status refused' ;;
+      history~*)
+        LIMIT=${SELECTOR#history~}
+        case "$LIMIT" in ''|*[!0-9]*) refuse 'invalid diagnostics history limit' ;; esac
+        [ "${#LIMIT}" -le 3 ] && [ "$LIMIT" -ge 1 ] && [ "$LIMIT" -le 100 ] || refuse 'out-of-range history limit'
+        sh "$MODDIR/ux05_diagnostics.sh" history "$LIMIT" > "$TMP" 2>/dev/null || refuse 'diagnostics history refused' ;;
+      *) refuse 'unsupported diagnostics read' ;;
+    esac ;;
+  response)
+    require_backend bindhosts.sh
+    [ "$SELECTOR" = status ] || refuse 'unsupported response read'
+    sh "$MODDIR/bindhosts.sh" --response status > "$TMP" 2>/dev/null || refuse 'blocked response status refused' ;;
 esac
 SIZE=$(wc -c < "$TMP" | tr -d ' ')
 case "$SIZE" in ''|*[!0-9]*) refuse 'invalid read size' ;; esac
