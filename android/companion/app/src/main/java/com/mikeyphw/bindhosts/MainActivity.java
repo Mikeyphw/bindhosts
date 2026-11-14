@@ -1,6 +1,11 @@
 package com.mikeyphw.bindhosts;
 
 import android.app.Activity;
+import android.graphics.Color;
+import android.util.TypedValue;
+import android.view.ViewGroup;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 import android.net.Uri;
 import android.os.Bundle;
 import android.webkit.WebResourceRequest;
@@ -18,7 +23,7 @@ import java.util.Collections;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-/** Read-only native bridge proof; the full UX10 bundle is not yet packaged. */
+/** The original UX10 WebUI, packed for a finite read-only native transport. */
 public final class MainActivity extends Activity {
     private static final String ORIGIN = "https://appassets.androidplatform.net";
     private ExecutorService worker;
@@ -28,24 +33,45 @@ public final class MainActivity extends Activity {
         super.onCreate(savedState);
         worker = Executors.newSingleThreadExecutor();
         web = new WebView(this);
-        setContentView(web);
+        // An out-of-WebView disclosure cannot be hidden by a bundled page.
+        LinearLayout frame = new LinearLayout(this);
+        frame.setOrientation(LinearLayout.VERTICAL);
+        frame.setBackgroundColor(Color.rgb(18, 20, 24));
+        TextView disclaimer = new TextView(this);
+        disclaimer.setText("UX10 shared UI · READ-ONLY PREVIEW · changes disabled");
+        disclaimer.setTextColor(Color.WHITE);
+        disclaimer.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        disclaimer.setPadding(18, 12, 18, 12);
+        disclaimer.setBackgroundColor(Color.rgb(47, 52, 64));
+        frame.addView(disclaimer, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        frame.addView(web, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
+        setContentView(frame);
         WebSettings settings = web.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setAllowFileAccess(false);
         settings.setAllowContentAccess(false);
         settings.setJavaScriptCanOpenWindowsAutomatically(false);
-        settings.setDomStorageEnabled(false);
+        settings.setDomStorageEnabled(true); // UX10 locale and appearance preferences only
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         WebViewAssetLoader loader = new WebViewAssetLoader.Builder()
                 .addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this)).build();
         web.setWebViewClient(new WebViewClient() {
             @Override public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
-                return loader.shouldInterceptRequest(request.getUrl());
+                Uri url = request.getUrl();
+                // Refuse remote subresources even when WebView later changes settings.
+                if (!"https".equals(url.getScheme()) || !"appassets.androidplatform.net".equals(url.getHost())
+                        || !url.getPath().startsWith("/assets/ux10/")) {
+                    return new WebResourceResponse("text/plain", "UTF-8", 403, "Forbidden",
+                            java.util.Collections.emptyMap(), new java.io.ByteArrayInputStream(new byte[0]));
+                }
+                return loader.shouldInterceptRequest(url);
             }
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri uri = request.getUrl();
                 return !request.isForMainFrame() || !ORIGIN.equals(uri.getScheme() + "://" + uri.getHost())
-                        || !uri.getPath().startsWith("/assets/");
+                        || !uri.getPath().startsWith("/assets/ux10/");
             }
         });
         if (!WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
@@ -79,11 +105,16 @@ public final class MainActivity extends Activity {
                 runOnUiThread(() -> replyProxy.postMessage(response.toString()));
             });
         });
-        web.loadUrl(ORIGIN + "/assets/index.html");
+        web.loadUrl(ORIGIN + "/assets/ux10/index.html");
     }
     @Override public void onBackPressed() {
-        if (web != null && web.canGoBack()) web.goBack();
-        else super.onBackPressed();
+        if (web == null) { super.onBackPressed(); return; }
+        // Forward Android Back through UX10's own managed-dialog/router handler.
+        // The fixed expression contains no user-supplied JavaScript.
+        web.evaluateJavascript("(window.__bhCompanionBack && window.__bhCompanionBack()) ? 'handled' : 'exit'",
+                result -> {
+                    if ("\"exit\"".equals(result)) finish();
+                });
     }
     @Override public void onDestroy() {
         if (web != null) web.destroy();

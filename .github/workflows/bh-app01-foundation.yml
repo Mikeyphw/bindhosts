@@ -5,6 +5,9 @@ on:
       - 'contracts/bh-app01-v1.json'
       - 'module/companion_api.sh'
       - 'webui/runtime/companion_transport.mjs'
+      - 'webui/vite.companion.config.js'
+      - 'webui/runtime/companion_kernelsu_alt.mjs'
+      - 'webui/runtime/companion_webuix.mjs'
       - 'android/companion/**'
       - 'tests/test_bh_app01_*'
       - 'scripts/ci/bh_app01_android_sdk.sh'
@@ -28,6 +31,10 @@ jobs:
           node --check webui/runtime/companion_transport.mjs
           node --check android/companion/app/src/main/assets/app.js
           node tests/test_bh_app01_transport.mjs
+          node --check webui/runtime/companion_kernelsu_alt.mjs
+          node --check webui/runtime/companion_webuix.mjs
+          node --check webui/vite.companion.config.js
+          node tests/test_bh_app01_p04_runtime.mjs
           python3 -m json.tool contracts/bh-app01-v1.json >/dev/null
       - name: Check contract and no native shell execution from WebUI
         run: |
@@ -53,6 +60,17 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Build the same UX10 entrypoint with read-only native adapters
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --global pnpm@11.22.0
+          pnpm --dir webui install --frozen-lockfile
+          pnpm --dir webui exec vite build --config vite.companion.config.js
+          python3 scripts/ci/bh_app01_p04_bundle_check.py
       - name: Install and verify Android SDK 36 (no obsolete tools package)
         shell: bash
         run: bash scripts/ci/bh_app01_android_sdk.sh
@@ -67,7 +85,7 @@ jobs:
           printf '%s\n' '${{ github.sha }}' > source-commit.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: bh-app01-p03-debug-${{ github.sha }}
+          name: bh-app01-p04-ux10-readonly-debug-${{ github.sha }}
           path: |
             android/companion/app/build/outputs/apk/debug/app-debug.apk
             android/companion/app/build/outputs/apk/debug/SHA256SUMS.txt
