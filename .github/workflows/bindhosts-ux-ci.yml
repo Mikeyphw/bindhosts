@@ -73,6 +73,7 @@ jobs:
           python3 tests/test_hosts_ux09.py
           python3 tests/test_hosts_update_ux09.py
           python3 tests/test_ux09e_acceptance.py
+          python3 tests/test_final_acceptance_ux09f.py
           python3 tests/test_blocked_response_ux04.py
           python3 tests/test_responder_install_permissions.py
           python3 tests/test_webui_ux0304.py
