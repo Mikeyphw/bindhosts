@@ -1,6 +1,9 @@
 package com.mikeyphw.bindhosts;
 
 import android.content.Intent;
+import android.app.AlertDialog;
+import android.widget.Button;
+import java.lang.reflect.Field;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.view.View;
@@ -20,9 +23,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static androidx.test.espresso.Espresso.onView;
-import static androidx.test.espresso.action.ViewActions.click;
 import static androidx.test.espresso.assertion.ViewAssertions.matches;
-import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
 import static org.junit.Assert.*;
 
@@ -96,6 +97,42 @@ public final class P07HostedUiTest {
         assertFalse(RootRunner.validPageArgument("exec|all|0|none"));
     }
 
+    /** Read the real native AlertDialog, never Espresso's unfocused Activity root. */
+    private static AlertDialog requireNativeUpdateConfirmation(
+            android.app.Instrumentation instrumentation, MainActivity activity) throws Exception {
+        Field field = MainActivity.class.getDeclaredField("updateConfirmation");
+        field.setAccessible(true); // Our own app class; no Android hidden API.
+        for (int n = 0; n < 50; n++) {
+            AtomicReference<AlertDialog> current = new AtomicReference<>();
+            instrumentation.runOnMainSync(() -> {
+                try {
+                    AlertDialog dialog = (AlertDialog) field.get(activity);
+                    if (dialog != null && dialog.isShowing() && dialog.getWindow() != null &&
+                            dialog.getButton(AlertDialog.BUTTON_NEGATIVE) != null) current.set(dialog);
+                } catch (IllegalAccessException error) {
+                    throw new AssertionError("Cannot inspect native dialog", error);
+                }
+            });
+            if (current.get() != null) return current.get();
+            Thread.sleep(100);
+        }
+        fail("Native QS update confirmation never became visible");
+        return null;
+    }
+
+    private static boolean dialogHasText(View view, String expected) {
+        if (view instanceof android.widget.TextView &&
+                expected.equals(String.valueOf(((android.widget.TextView) view).getText())) &&
+                view.isShown()) return true;
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
+            for (int n = 0; n < group.getChildCount(); n++) {
+                if (dialogHasText(group.getChildAt(n), expected)) return true;
+            }
+        }
+        return false;
+    }
+
     @Test public void updateTileIntentRequiresExplicitConfirmationAndCanBeCancelled() throws Exception {
         // HF04: HF02 and HF03 both passed the actual dialog + Cancel assertions,
         // but ActivityScenario.close() timed out waiting for DESTROYED (PAUSED in
@@ -115,10 +152,27 @@ public final class P07HostedUiTest {
                         .setAction(MainActivity.ACTION_CONFIRM_UPDATE);
                 activity.onNewIntent(qs);
             });
-            onView(withText("Update Bindhosts rules?")).check(matches(isDisplayed()));
-            // Never tap Update: this is a hosted read-only safety acceptance.
-            onView(withText("Cancel")).perform(click());
+            // Espresso's default RootViewPicker targeted the BASE_APPLICATION
+            // background view, which correctly has no focus under AlertDialog.
+            // Inspect the actual native AlertDialog window and press its real
+            // negative button. The separate ADB cold-start test also performs
+            // a physical UIAutomator-located Cancel tap on this emulator.
+            AlertDialog confirmation = requireNativeUpdateConfirmation(instrumentation, activity);
+            instrumentation.runOnMainSync(() -> {
+                assertTrue("Native QS confirmation must be visible", confirmation.isShowing());
+                assertTrue("Native title not shown in dialog window", dialogHasText(
+                        confirmation.getWindow().getDecorView(), "Update Bindhosts rules?"));
+                Button cancel = confirmation.getButton(AlertDialog.BUTTON_NEGATIVE);
+                Button update = confirmation.getButton(AlertDialog.BUTTON_POSITIVE);
+                assertNotNull("Cancel button missing", cancel);
+                assertNotNull("Update button missing", update);
+                assertTrue("Cancel button is not actually shown", cancel.isShown());
+                assertEquals("Cancel", String.valueOf(cancel.getText()));
+                assertEquals("Update", String.valueOf(update.getText()));
+                assertTrue("Cancel click was refused", cancel.performClick());
+            });
             instrumentation.waitForIdleSync();
+            assertFalse("Cancel failed to dismiss real confirmation", confirmation.isShowing());
             instrumentation.runOnMainSync(() -> {
                 assertFalse("QS action was not consumed",
                         MainActivity.ACTION_CONFIRM_UPDATE.equals(activity.getIntent().getAction()));

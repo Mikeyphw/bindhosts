@@ -43,10 +43,10 @@ class P07(unittest.TestCase):
         for name in sign.EXPECTED_TESTS:
             self.assertIn('void '+name+'()', code)
         for fragment in ('ActivityScenario.launch', 'document.readyState',
-                         'location.origin', 'document.querySelector', 'withText("Cancel")',
+                         'location.origin', 'document.querySelector', 'AlertDialog.BUTTON_NEGATIVE',
                          'getAllowContentAccess()', 'getAllowFileAccess()',
                          'android.permission.INTERNET', 'assertFalse(RootRunner.',
-                         'onView(withText("Update Bindhosts rules?"))'):
+                         'dialogHasText('):
             self.assertIn(fragment, code)
         self.assertIn('testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"',gradle)
         self.assertIn('androidTestImplementation("androidx.test.espresso:espresso-core:',gradle)
@@ -73,7 +73,10 @@ class P07(unittest.TestCase):
         self.assertNotIn('activity.startActivity(qs)',test)
         self.assertIn('instrumentation.startActivitySync(launch)',test)
         self.assertNotIn('scenario.getState()',test)
-        self.assertIn('onView(withText("Cancel")).perform(click())',test)
+        self.assertIn('requireNativeUpdateConfirmation(instrumentation, activity)',test)
+        self.assertIn('cancel.performClick()',test)
+        self.assertIn('dialogHasText(',test)
+        self.assertNotIn('onView(withText("Cancel")).perform(click())',test)
         hosted=(ROOT/'scripts/ci/bh_app01_p07_emulator.sh').read_text()
         self.assertIn('adb shell am force-stop com.mikeyphw.bindhosts',hosted)
         self.assertIn('adb shell am start -W',hosted)
@@ -258,6 +261,24 @@ esac
             (out/'failed-command-exit.txt').write_text('1\n')
             with self.assertRaises(ValueError):sign.qualify(out,sha)
 
+    def test_hf06_reject_unfocused_espresso_background_root_and_preserve_real_cancel(self):
+        source = (APK/'src/androidTest/java/com/mikeyphw/bindhosts/P07HostedUiTest.java').read_text()
+        third = source.split('void updateTileIntentRequiresExplicitConfirmationAndCanBeCancelled()',1)[1]
+        third = third.split('\n    }',1)[0]
+        self.assertIn('AlertDialog confirmation = requireNativeUpdateConfirmation', third)
+        self.assertIn('dialogHasText(', third)
+        self.assertIn('Button cancel = confirmation.getButton(AlertDialog.BUTTON_NEGATIVE)', third)
+        self.assertIn('cancel.performClick()', third)
+        self.assertIn('Cancel failed to dismiss real confirmation', third)
+        self.assertNotIn('onView(', third)
+        self.assertNotIn('ActivityScenario.launch(', third)
+        # The real ADB cold-start/dialog/CANCEL action remains a separate gate.
+        shell=(ROOT/'scripts/ci/bh_app01_p07_emulator.sh').read_text()
+        for fragment in ('adb shell am force-stop', 'adb shell am start -W',
+                         'qs-cold-start-hierarchy.xml', 'adb shell input tap "$x" "$y"',
+                         'QS_CONFIRM_CANCELLED'):
+            self.assertIn(fragment, shell)
+
     def test_hf04_cinderbox_api36_runner_is_pinned_and_disposable(self):
         workflow = WORKFLOW.read_text()
         proven = 'ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d'
@@ -278,8 +299,8 @@ esac
         for must in ('instrumentation.startActivitySync(launch)',
                      'instrumentation.runOnMainSync(() -> {',
                      'activity.onNewIntent(qs)',
-                     'onView(withText("Update Bindhosts rules?"))',
-                     'onView(withText("Cancel")).perform(click())',
+                     'requireNativeUpdateConfirmation(instrumentation, activity)',
+                     'dialogHasText(', 'cancel.performClick()',
                      'assertFalse("Cancel unexpectedly finished the Activity"',
                      'assertNotNull("Cancel must leave the native WebView attached"',
                      'finally {', 'activity.finish();', 'instrumentation.waitForIdleSync()'):
