@@ -97,21 +97,24 @@ public final class P07HostedUiTest {
     }
 
     @Test public void updateTileIntentRequiresExplicitConfirmationAndCanBeCancelled() throws Exception {
-        Intent i = new Intent(InstrumentationRegistry.getInstrumentation().getTargetContext(), MainActivity.class);
-        i.setAction(MainActivity.ACTION_CONFIRM_UPDATE);
-        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(i)) {
-            // Cold-start QS ACTION_CONFIRM_UPDATE must reach RESUMED before
-            // showing the native confirmation; the previous onCreate modal
-            // stalled ActivityScenario at PRE_ON_CREATE in hosted API36.
+        // AndroidX ActivityScenario.launch(Intent with QS action) did not dispatch
+        // on API36 (PRE_ON_CREATE, launcher screenshot, no application crash).
+        // Qualify cold-start with an independent real ADB am-start/UI-tree check
+        // in bh_app01_p07_emulator.sh. Here use the fully resumed actual Activity
+        // and a real ActivityManager onNewIntent delivery to test QS+Cancel.
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
             scenario.onActivity(activity -> {
-                assertFalse("Confirmation action must be consumed once", 
-                        MainActivity.ACTION_CONFIRM_UPDATE.equals(activity.getIntent().getAction()));
+                Intent qs = new Intent(activity, MainActivity.class)
+                        .setAction(MainActivity.ACTION_CONFIRM_UPDATE)
+                        .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                activity.startActivity(qs);
             });
             onView(withText("Update Bindhosts rules?")).check(matches(isDisplayed()));
             // Never tap the positive action on a hosted emulator or a real device.
             onView(withText("Cancel")).perform(click());
             AtomicReference<WebView> current = new AtomicReference<>();
             scenario.onActivity(activity -> {
+                assertFalse("QS action was not consumed", MainActivity.ACTION_CONFIRM_UPDATE.equals(activity.getIntent().getAction()));
                 assertFalse(activity.isFinishing());
                 current.set(findWeb(activity.getWindow().getDecorView()));
             });

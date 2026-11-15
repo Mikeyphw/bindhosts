@@ -31,10 +31,33 @@ def qualify(evidence, sha):
     b = image.read_bytes()
     if len(b) < 4096 or b[:8] != b'\x89PNG\r\n\x1a\n':
         raise ValueError('missing real hosted screenshot')
+    # Mandatory independent real ActivityManager cold-start evidence.
+    receipt = (evidence / 'qs-cold-start-receipt.txt').read_text()
+    expected = ('schema=bh-app01/p07/hf02\nsource_sha=' + sha +
+                '\nemulator_api=36\ncold_start_confirm=PASS\nqs_cancel=PASS' +
+                '\nphysical_device_writes=false\n')
+    if receipt != expected:
+        raise ValueError('missing/inconsistent real cold-start QS receipt')
+    if not (evidence / 'qs-cold-start-am.txt').read_text().count('Status: ok') == 1:
+        raise ValueError('cold-start ActivityManager did not succeed')
+    shot = (evidence / 'api36-qs-confirmation.png').read_bytes()
+    if len(shot) < 4096 or shot[:8] != b'\x89PNG\r\n\x1a\n':
+        raise ValueError('missing QS-confirmation screenshot')
+    audit = (evidence / 'qs-cold-start-logcat.txt').read_text()
+    for marker in ('QS_CONFIRM_INTENT_ACCEPTED','QS_CONFIRM_DIALOG_VISIBLE','QS_CONFIRM_CANCELLED'):
+        if marker not in audit: raise ValueError('missing actual native confirmation/cancel event: '+marker)
+    from importlib.util import spec_from_file_location, module_from_spec
+    parser_file = Path(__file__).with_name('bh_app01_p07_qs_hierarchy.py')
+    spec = spec_from_file_location('bh_app01_p07_hf02_tree',parser_file)
+    parser = module_from_spec(spec)
+    spec.loader.exec_module(parser)
+    parser.parse(evidence / 'qs-cold-start-hierarchy.xml')
+    if (evidence/'failed-command-exit.txt').exists():
+        raise ValueError('failure evidence cannot qualify')
     apk = (evidence / 'apk-sha256.txt').read_text().strip()
     if not re.fullmatch('[0-9a-f]{64}', apk):
         raise ValueError('missing APK SHA256 evidence')
-    xmls = list(evidence.glob('*.xml'))
+    xmls = list(evidence.glob('TEST-*.xml'))
     if not xmls:
         raise ValueError('no instrumentation XML')
     found = set()
@@ -60,6 +83,8 @@ def qualify(evidence, sha):
         'test_count': len(found),
         'apk_sha256': apk,
         'screenshot_sha256': hashlib.sha256(b).hexdigest(),
+        'qs_confirmation_screenshot_sha256': hashlib.sha256(shot).hexdigest(),
+        'real_cold_start_qs_confirm_and_cancel': True,
         'hosted_api36_qualified': True,
         'physical_android16_qualified': False,
         'release_qualified': False,

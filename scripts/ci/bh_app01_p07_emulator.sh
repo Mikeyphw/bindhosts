@@ -58,8 +58,63 @@ find "$reportdir" -type f -name '*.xml' -exec cp -- {} "$out"/ \;
 [[ $(find "$out" -maxdepth 1 -name '*.xml' -type f | wc -l) -ge 1 ]] || {
   echo 'BH_APP01_P07_REFUSED: instrumentation XML absent' >&2; exit 12;
 }
-adb shell am start -n com.mikeyphw.bindhosts/.MainActivity
-# Only the disposable emulator screenshot is captured; never a physical-device image.
+# A separate, true cold-start QS intent is required: ActivityScenario.launch
+# with a custom action timed out at PRE_ON_CREATE despite normal launch passing.
+# This test uses the system ActivityManager and reads the actual UI hierarchy.
+adb shell am force-stop com.mikeyphw.bindhosts
+adb logcat -c
+adb shell am start -W -n com.mikeyphw.bindhosts/.MainActivity \
+  -a com.mikeyphw.bindhosts.CONFIRM_UPDATE > "$out/qs-cold-start-am.txt"
+[[ $(cat "$out/qs-cold-start-am.txt") == *'Status: ok'* ]] || {
+  echo 'BH_APP01_P07_HF02_REFUSED: cold-start am launch did not report Status ok' >&2; exit 12;
+}
+confirmed=0
+for attempt in $(seq 1 12); do
+  # Dump is an emulator-only read. Do not assume a dialog exists from its intent.
+  if timeout 15s adb shell uiautomator dump /sdcard/bh-app01-p07-hf02.xml >/dev/null 2>&1; then
+    adb exec-out cat /sdcard/bh-app01-p07-hf02.xml > "$out/qs-cold-start-hierarchy.xml" || :
+    if python3 scripts/ci/bh_app01_p07_qs_hierarchy.py \
+        --hierarchy "$out/qs-cold-start-hierarchy.xml" --action verify; then
+      confirmed=1; break
+    fi
+  fi
+  sleep 2
+done
+[[ $confirmed == 1 ]] || {
+  echo 'BH_APP01_P07_HF02_REFUSED: real cold-start QS dialog not observed' >&2; exit 12;
+}
+adb exec-out screencap -p > "$out/api36-qs-confirmation.png"
+[[ $(wc -c < "$out/api36-qs-confirmation.png") -gt 4096 ]] || {
+  echo 'BH_APP01_P07_HF02_REFUSED: QS screenshot absent or invalid' >&2; exit 12;
+}
+# Tap the actual Cancel bounds from the UI hierarchy, never the Update button.
+read -r x y < <(python3 scripts/ci/bh_app01_p07_qs_hierarchy.py \
+    --hierarchy "$out/qs-cold-start-hierarchy.xml" --action cancel-coordinates)
+[[ $x =~ ^[0-9]{1,5}$ && $y =~ ^[0-9]{1,5}$ ]] || exit 12
+adb shell input tap "$x" "$y"
+for attempt in $(seq 1 12); do
+  adb logcat -d -s BH_APP01_P07:I > "$out/qs-cold-start-logcat.txt"
+  if grep -Fq 'QS_CONFIRM_INTENT_ACCEPTED' "$out/qs-cold-start-logcat.txt" &&
+     grep -Fq 'QS_CONFIRM_DIALOG_VISIBLE' "$out/qs-cold-start-logcat.txt" &&
+     grep -Fq 'QS_CONFIRM_CANCELLED' "$out/qs-cold-start-logcat.txt"; then
+    break
+  fi
+  sleep 1
+done
+for token in QS_CONFIRM_INTENT_ACCEPTED QS_CONFIRM_DIALOG_VISIBLE QS_CONFIRM_CANCELLED; do
+  grep -Fq "$token" "$out/qs-cold-start-logcat.txt" || {
+    echo "BH_APP01_P07_HF02_REFUSED: missing native event $token" >&2; exit 12;
+  }
+done
+# Confirm explicit Cancel did not close the app, rather than merely making
+# the dialog disappear while the app crashes or returns to the launcher.
+state=$(adb shell dumpsys activity activities)
+[[ "$state" == *'com.mikeyphw.bindhosts/.MainActivity'* ]] || {
+  echo 'BH_APP01_P07_HF02_REFUSED: activity missing after Cancel' >&2; exit 12;
+}
+printf 'schema=bh-app01/p07/hf02\nsource_sha=%s\nemulator_api=36\ncold_start_confirm=PASS\nqs_cancel=PASS\nphysical_device_writes=false\n' \
+    "$SOURCE_SHA" > "$out/qs-cold-start-receipt.txt"
+# Original hosted screenshot and exact-SHA signoff remain mandatory.
 adb exec-out screencap -p > "$out/api36-home.png"
 [[ $(wc -c < "$out/api36-home.png") -gt 4096 ]] || {
   echo 'BH_APP01_P07_REFUSED: hosted screenshot missing or invalid' >&2; exit 12;

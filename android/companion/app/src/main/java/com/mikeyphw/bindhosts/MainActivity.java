@@ -33,6 +33,7 @@ import java.util.concurrent.Executors;
 /** Shared UX10 UI with a finite, versioned native hosts-control bridge. */
 public final class MainActivity extends Activity {
     public static final String ACTION_CONFIRM_UPDATE = "com.mikeyphw.bindhosts.CONFIRM_UPDATE";
+    private static final String P07_AUDIT_TAG = "BH_APP01_P07";
     private static final String ORIGIN = "https://appassets.androidplatform.net";
     private static final int PICK_TEXT_REQUEST = 6406;
     private ExecutorService worker;
@@ -213,6 +214,7 @@ public final class MainActivity extends Activity {
         if (intent != null && ACTION_CONFIRM_UPDATE.equals(intent.getAction())) {
             intent.setAction(null); // Consume once: no repeated modal on recreation.
             pendingUpdateConfirmation = true;
+            android.util.Log.i(P07_AUDIT_TAG, "QS_CONFIRM_INTENT_ACCEPTED");
             scheduleUpdateConfirmation();
         }
     }
@@ -312,7 +314,8 @@ public final class MainActivity extends Activity {
         updateConfirmation = new android.app.AlertDialog.Builder(this)
                 .setTitle("Update Bindhosts rules?")
                 .setMessage("Download configured sources and apply only after verification. An existing update cannot be restarted concurrently.")
-                .setNegativeButton("Cancel", (dialog, which) -> {})
+                .setNegativeButton("Cancel", (dialog, which) ->
+                        android.util.Log.i(P07_AUDIT_TAG, "QS_CONFIRM_CANCELLED"))
                 .setPositiveButton("Update", (dialog, which) -> {
                     worker.execute(() -> {
                         String result;
@@ -332,6 +335,7 @@ public final class MainActivity extends Activity {
                 }).create();
         updateConfirmation.setOnDismissListener(dialog -> updateConfirmation = null);
         updateConfirmation.show();
+        android.util.Log.i(P07_AUDIT_TAG, "QS_CONFIRM_DIALOG_VISIBLE");
     }
     @Override public void onBackPressed() {
         if (web == null) { super.onBackPressed(); return; }

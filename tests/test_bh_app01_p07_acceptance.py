@@ -67,9 +67,18 @@ class P07(unittest.TestCase):
         self.assertIn('updateConfirmation.setOnDismissListener', activity)
         self.assertIn('updateConfirmation.dismiss()', activity)
         self.assertNotIn('intent.setAction(null); // Avoid repeating a prior confirmation after recreation.\n            showConfirmUpdate();',activity)
-        self.assertIn('ActivityScenario.launch(i)',test)
-        self.assertIn('Confirmation action must be consumed once',test)
+        self.assertIn('ActivityScenario.launch(MainActivity.class)',test)
+        self.assertNotIn('ActivityScenario.launch(i)',test)
+        self.assertIn('Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP',test)
+        self.assertIn('activity.startActivity(qs)',test)
         self.assertIn('onView(withText("Cancel")).perform(click())',test)
+        hosted=(ROOT/'scripts/ci/bh_app01_p07_emulator.sh').read_text()
+        self.assertIn('adb shell am force-stop com.mikeyphw.bindhosts',hosted)
+        self.assertIn('adb shell am start -W',hosted)
+        self.assertIn('bh_app01_p07_qs_hierarchy.py',hosted)
+        self.assertIn('QS_CONFIRM_CANCELLED',hosted)
+        self.assertIn('qs-cold-start-receipt.txt',hosted)
+        self.assertNotIn('adb shell input tap 0 0',hosted)
 
     def test_hf01_fail_closed_emulator_diagnostics(self):
         hosted=(ROOT/'scripts/ci/bh_app01_p07_emulator.sh').read_text()
@@ -145,6 +154,13 @@ esac
         (out/'emulator-api.txt').write_text('35\n' if wrong_api else '36\n')
         (out/'apk-sha256.txt').write_text('c'*64+'\n')
         (out/'api36-home.png').write_bytes(b'\x89PNG\r\n\x1a\n'+b'x'*6000)
+        (out/'api36-qs-confirmation.png').write_bytes(b'\x89PNG\r\n\x1a\n'+b'y'*6000)
+        (out/'qs-cold-start-am.txt').write_text('Status: ok\n')
+        (out/'qs-cold-start-receipt.txt').write_text('schema=bh-app01/p07/hf02\nsource_sha='+sha+
+            '\nemulator_api=36\ncold_start_confirm=PASS\nqs_cancel=PASS\nphysical_device_writes=false\n')
+        (out/'qs-cold-start-logcat.txt').write_text('QS_CONFIRM_INTENT_ACCEPTED\nQS_CONFIRM_DIALOG_VISIBLE\nQS_CONFIRM_CANCELLED\n')
+        (out/'qs-cold-start-hierarchy.xml').write_text('<hierarchy rotation="0"><node text="Update Bindhosts rules?" />'
+            '<node text="Cancel" enabled="true" clickable="true" bounds="[10,20][110,120]" /></hierarchy>')
         if present:
             testcase=''.join(f'<testcase classname="com.mikeyphw.bindhosts.P07HostedUiTest" name="{name}">' +
                               ('<failure />' if fail and k==0 else '<skipped />' if skip and k==0 else '')+
@@ -161,11 +177,16 @@ esac
             self.assertFalse(receipt['physical_android16_qualified'])
             self.assertFalse(receipt['release_qualified'])
             self.assertEqual(receipt['test_count'],3)
+            self.assertTrue(receipt['real_cold_start_qs_confirm_and_cancel'])
 
     def test_evidence_negatives_refuse_without_silent_degradation(self):
         variations=[dict(present=False), dict(wrong_api=True),dict(fail=True),
                     dict(skip=True),dict(missing='api36-home.png'),
-                    dict(missing='apk-sha256.txt'),dict(missing='source-commit.txt')]
+                    dict(missing='apk-sha256.txt'),dict(missing='source-commit.txt'),
+                    dict(missing='qs-cold-start-receipt.txt'),
+                    dict(missing='qs-cold-start-hierarchy.xml'),
+                    dict(missing='api36-qs-confirmation.png'),
+                    dict(missing='qs-cold-start-logcat.txt')]
         for n,variation in enumerate(variations):
             with self.subTest(case=n), tempfile.TemporaryDirectory() as tmp:
                 out=Path(tmp)/'evidence';sha=self.create(out,**variation)
@@ -174,5 +195,38 @@ esac
         with tempfile.TemporaryDirectory() as tmp:
             out=Path(tmp)/'evidence';self.create(out)
             with self.assertRaises(ValueError):sign.qualify(out,'b'*40)
+
+    def test_hf02_ui_hierarchy_parsing_and_adversarial_refusals(self):
+        import importlib.util
+        parser=ROOT/'scripts/ci/bh_app01_p07_qs_hierarchy.py'
+        spec=importlib.util.spec_from_file_location('bh_hf02_parser',parser)
+        module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+        with tempfile.TemporaryDirectory() as tmp:
+            p=Path(tmp)/'screen.xml'
+            p.write_text('<hierarchy><node text="Update Bindhosts rules?" />'
+                         '<node text="CANCEL" enabled="true" clickable="true" bounds="[20,40][120,100]" /></hierarchy>')
+            self.assertEqual(module.parse(p),(70,70))
+            negatives=[
+               '<hierarchy><node text="Update"/><node text="Cancel" enabled="true" clickable="true" bounds="[10,20][20,40]"/></hierarchy>',
+               '<hierarchy><node text="Update Bindhosts rules?" /><node text="Update" enabled="true" clickable="true" bounds="[10,20][20,40]"/></hierarchy>',
+               '<hierarchy><node text="Update Bindhosts rules?" /><node text="Cancel" enabled="false" clickable="true" bounds="[10,20][20,40]"/></hierarchy>',
+               '<hierarchy><node text="Update Bindhosts rules?" /><node text="Cancel" enabled="true" clickable="true" bounds="[-5,20][20,40]"/></hierarchy>',
+               '<html><node text="Update Bindhosts rules?" /><node text="Cancel" enabled="true" clickable="true" bounds="[10,20][20,40]"/></html>',
+            ]
+            for content in negatives:
+                p.write_text(content)
+                with self.assertRaises(ValueError):module.parse(p)
+
+    def test_hf02_cold_start_receipt_wrong_sha_audit_and_failure_artifacts_refused(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out=Path(tmp)/'evidence';sha=self.create(out)
+            (out/'qs-cold-start-receipt.txt').write_text('schema=bh-app01/p07/hf02\nsource_sha='+'b'*40+'\nemulator_api=36\ncold_start_confirm=PASS\nqs_cancel=PASS\nphysical_device_writes=false\n')
+            with self.assertRaises(ValueError):sign.qualify(out,sha)
+            (out/'qs-cold-start-receipt.txt').write_text('schema=bh-app01/p07/hf02\nsource_sha='+sha+'\nemulator_api=36\ncold_start_confirm=PASS\nqs_cancel=PASS\nphysical_device_writes=false\n')
+            (out/'qs-cold-start-logcat.txt').write_text('QS_CONFIRM_INTENT_ACCEPTED\nQS_CONFIRM_DIALOG_VISIBLE\n')
+            with self.assertRaises(ValueError):sign.qualify(out,sha)
+            (out/'qs-cold-start-logcat.txt').write_text('QS_CONFIRM_INTENT_ACCEPTED\nQS_CONFIRM_DIALOG_VISIBLE\nQS_CONFIRM_CANCELLED\n')
+            (out/'failed-command-exit.txt').write_text('1\n')
+            with self.assertRaises(ValueError):sign.qualify(out,sha)
 
 if __name__=='__main__': unittest.main()
