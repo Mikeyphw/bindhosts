@@ -13,41 +13,19 @@ versionCode=$(grep versionCode "$MODPATH/module.prop" | sed 's/versionCode=//g' 
 echo "[+] bindhosts v$versionCode "
 echo "[%] customize.sh "
 
-# Function to detect key press (Volume Up or Volume Down) or timeout
-detect_key_press() {
-    timeout_seconds=6  # Modify this to change the wait time
-
-    # Read input with timeout using a pipe and capture the exit code
-    read -r -t $timeout_seconds line < <(getevent -ql | awk '/KEY_VOLUME/ {print; exit}')
-
-    # Check if input was read or timed out
-    if [ $? -eq 142 ]; then  # Timeout exit code
-        echo "[!] No key pressed within $timeout_seconds seconds. Skipping installation..."
-        return 1
-    fi
-
-    # Process key press based on the detected input
-    if echo "$line" | grep -q "KEY_VOLUMEUP"; then
-        return 0  # Installing Bindhosts-app
+# Companion bundled by the exact-SHA GitHub hosted acceptance workflow.
+# No legacy app, network download, or automatic root capability grant.
+if [ -f "$MODPATH/companion/bindhosts-companion.apk" ]; then
+    echo '[+] Installing the bundled bindhosts Companion (offline, SHA-verified)'
+    if sh "$MODPATH/bindhosts-app.sh"; then
+        echo '[+] Bundled Companion installed or already identical'
     else
-        echo "[+] Skipping installation..."
-        return 1
+        echo '[!] Companion installation was refused; bindhosts module installation continues'
+        echo '[!] Do not uninstall an existing app to bypass signature/version errors'
     fi
-}
-
-# Installation prompt if bindhosts app is not installed
-pm path me.itejo443.bindhosts > /dev/null 2>&1 || [ -f "$PERSISTENT_DIR/bindhosts_webui" ] || {
-    # Install App Section
-    echo "[+] BindHosts-app, Ref:github.com/itejo443/BindHosts-app"
-    echo "[?] Do you want to install BindHosts-app"
-    echo "[?] VOL [+]: YES"
-    echo "[?] VOL [-]: NO"
-    if detect_key_press; then
-        echo "[+] Installing BindHosts-app..."
-	busybox chmod +x "$MODPATH/bindhosts-app.sh"
-        sh "$MODPATH/bindhosts-app.sh"
-    fi
-}
+else
+    echo '[!] No bundled Companion APK; module installation continues without app installation'
+fi
 
 # persistence
 [ ! -d $PERSISTENT_DIR ] && mkdir -p $PERSISTENT_DIR

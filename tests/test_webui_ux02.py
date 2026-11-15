@@ -42,9 +42,16 @@ class UX02Contract(unittest.TestCase):
         router=(ROOT/'webui/route.js').read_text()
         self.assertIn('catalogHtml',router)
         self.assertIn('appsHtml',router)
+        # A module-version bump must not make unrelated UX regressions fail.
+        # Check the actual version and its numeric code are coherent instead
+        # of pinning an old TrackerGuard release forever.
         version=(ROOT/'module/module.prop').read_text()
-        self.assertIn('version=v2.1.5-tg.0.11',version)
-        self.assertIn('versionCode=21611',version)
+        release=re.search(r'(?m)^version=v2\.1\.5-tg\.0\.(\d+)$',version)
+        version_code=re.search(r'(?m)^versionCode=(\d+)$',version)
+        self.assertIsNotNone(release)
+        self.assertIsNotNone(version_code)
+        self.assertGreaterEqual(int(release.group(1)),11)
+        self.assertEqual(int(version_code.group(1)),21600+int(release.group(1)))
 
     def test_ci_runs_new_tests(self):
         workflow=(ROOT/'.github/workflows/bindhosts-ux-ci.yml').read_text()

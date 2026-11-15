@@ -1,0 +1,127 @@
+name: BH-APP01 P07 Module ZIP with Hosted-Tested Companion APK
+on:
+  pull_request:
+    paths:
+      - 'android/companion/**'
+      - 'module/**'
+      - 'native/**'
+      - 'webui/**'
+      - 'scripts/ci/bh_app01_p07_*'
+      - 'tests/test_bh_app01_*'
+      - 'docs/BH_APP01_P07_PH03_*'
+      - '.github/workflows/bh-app01-module-with-apk.yml'
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+concurrency:
+  group: bh-app01-module-apk-${{ github.event.pull_request.head.sha }}
+  cancel-in-progress: false
+jobs:
+  build-module-with-hosted-tested-apk:
+    if: github.event.pull_request.head.repo.full_name == 'Mikeyphw/bindhosts'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 85
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+      GH_TOKEN: ${{ github.token }}
+      REPO: Mikeyphw/bindhosts
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Require exact PR source and four green hosted checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          python3 -B scripts/ci/bh_app01_p07_bundle_apk.py gate \
+            --source-sha "$SOURCE_SHA" \
+            --run-id-file "$RUNNER_TEMP/bh-app01-hosted-run.txt" \
+            --deadline-seconds 1200
+      - name: Download exact-hosted-tested APK and acceptance evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          run_id="$(cat "$RUNNER_TEMP/bh-app01-hosted-run.txt")"
+          [[ "$run_id" =~ ^[0-9]{6,20}$ ]] || exit 12
+          mkdir -p "$RUNNER_TEMP/bh-app01-hosted"
+          gh run download "$run_id" --repo "$REPO" \
+            --name "bh-app01-p07-api36-${SOURCE_SHA}" \
+            --dir "$RUNNER_TEMP/bh-app01-hosted"
+          test -s "$RUNNER_TEMP/bh-app01-hosted/hosted-app-debug.apk"
+          test -s "$RUNNER_TEMP/bh-app01-hosted/hosted-receipt.json"
+      - name: Install supported toolchains on GitHub Actions only
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools'
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.x'
+          cache: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Build module native scanners and responders for all supported ABIs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          sdkmanager --install 'ndk;27.2.12479018'
+          NDK="$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          for entry in \
+            'arm64-v8a:arm64:aarch64-linux-android26-clang' \
+            'armeabi-v7a:arm:armv7a-linux-androideabi26-clang' \
+            'x86_64:amd64:x86_64-linux-android26-clang'; do
+            IFS=: read -r abi go_arch cc <<< "$entry"
+            mkdir -p "module/bin/$abi"
+            "$NDK/$cc" -std=c11 -O2 -fPIE -pie -D_FORTIFY_SOURCE=2 \
+              -Wall -Wextra -Werror native/axmlscan.c -o "module/bin/$abi/axmlscan"
+            "$NDK/$cc" -std=c11 -O2 -fPIE -pie -D_FORTIFY_SOURCE=2 \
+              -Wall -Wextra -Werror native/blocked_response.c -o "module/bin/$abi/blocked_response"
+            GOOS=android GOARCH="$go_arch" CGO_ENABLED=1 CC="$NDK/$cc" \
+              go build -trimpath -ldflags='-s -w' \
+              -o "module/bin/$abi/blocked_response_tls" ./native/blocked_response_tls/main.go
+            chmod 0755 "module/bin/$abi/axmlscan" "module/bin/$abi/blocked_response" "module/bin/$abi/blocked_response_tls"
+          done
+      - name: Build module WebUI payload (not the companion APK)
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --global pnpm@11.22.0
+          pnpm --dir webui install --frozen-lockfile
+          pnpm --dir webui build
+          test -s module/webroot/index.html
+      - name: Verify installer scripts and new source regression tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          sh -n module/bindhosts-app.sh
+          bash -n module/customize.sh
+          python3 -B -m unittest discover -s tests -p 'test_bh_app01_p07_module_bundle.py' -v
+      - name: Recheck exact HEAD, then pack the same hosted-tested APK in the module
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B scripts/ci/bh_app01_p07_bundle_apk.py gate \
+            --source-sha "$SOURCE_SHA" \
+            --run-id-file "$RUNNER_TEMP/bh-app01-hosted-run.txt" \
+            --deadline-seconds 0
+          mkdir -p "$RUNNER_TEMP/bh-app01-dist"
+          outfile="$RUNNER_TEMP/bh-app01-dist/bindhosts-P07-companion-${SOURCE_SHA}.zip"
+          python3 -B scripts/ci/bh_app01_p07_bundle_apk.py package \
+            --source-sha "$SOURCE_SHA" \
+            --evidence "$RUNNER_TEMP/bh-app01-hosted" \
+            --module module --output "$outfile"
+          python3 -B scripts/ci/bh_app01_p07_bundle_apk.py verify \
+            --source-sha "$SOURCE_SHA" --bundle "$outfile"
+          sha256sum "$outfile" > "$outfile.sha256"
+          test -s "$outfile" && test -s "$outfile.sha256"
+      - name: Upload installable KernelSU/APatch/Magisk module containing tested APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: bh-app01-module-companion-${{ env.SOURCE_SHA }}
+          path: ${{ runner.temp }}/bh-app01-dist/
+          if-no-files-found: error
+          retention-days: 30

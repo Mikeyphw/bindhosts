@@ -37,6 +37,9 @@ on:
       - 'module/data/source-catalog.tsv'
       - 'tests/test_source_catalog.py'
       - 'tests/test_webui_ux01.py'
+      - 'scripts/ci/bh_app01_p07_*'
+      - 'tests/test_bh_app01_p07_*'
+      - 'docs/BH_APP01_P07_*'
       - '.github/workflows/bindhosts-ux-ci.yml'
   workflow_dispatch:
 permissions:

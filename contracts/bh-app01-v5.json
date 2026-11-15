@@ -1,0 +1,25 @@
+{
+  "schema": "bh-app01/v5",
+  "api_version": 5,
+  "scope": "P04B-P03 native UX05 Activity, UX06 backup, UX07 response controls",
+  "arbitrary_shell_supported": false,
+  "auto_certificate_installation": false,
+  "max_command_reply_bytes": 4000,
+  "max_paginated_read_bytes": 262144,
+  "read_page_sources": {
+    "backup": ["status", "health", "list", "imports", "verify~SNAPSHOT_ID", "preview~SNAPSHOT_ID"],
+    "diagnostics": ["status", "history~1..100"],
+    "response": ["status"]
+  },
+  "verified_actions": {
+    "backup": ["create", "restore~SNAPSHOT_ID", "export~SNAPSHOT_ID", "import~ARCHIVE_NAME"],
+    "diagnostics": ["export"],
+    "response": ["set~off", "set~transparent", "set~logo", "https~cert-create", "https~cert-export", "https~enable", "https~disable", "https~test"]
+  },
+  "preserved_backends": [
+    "config_backup_safe.sh", "ux05_diagnostics.sh", "bindhosts.sh --response"
+  ],
+  "privacy": "Native bridge only handles explicit UX10 user actions; backup export and diagnostics export put files in Downloads only after existing UI confirmation",
+  "tls_trust": "User installs any exported public CA via Android settings, independent of local TLS success; no trust verification is claimed",
+  "physical_acceptance": "pending"
+}

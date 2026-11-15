@@ -1,0 +1,17 @@
+{
+  "schema": "bh-app01/v2",
+  "api_version": 2,
+  "source": "UX08 safe hosts control + UX09 detached journaled update",
+  "allowed_operations": {
+    "pause": {"mutates": true, "expected_hosts": "PAUSED", "receipt": "BH_HOSTS_PAUSE_PASS", "requires_readback": true},
+    "resume": {"mutates": true, "expected_hosts": "ACTIVE", "receipt": "BH_HOSTS_RESUME_PASS", "requires_readback": true},
+    "update-start": {"mutates": true, "requires_confirmation": true, "detached": true},
+    "update-status": {"mutates": false},
+    "update-events": {"mutates": false, "encoded": "base64", "bounded_bytes": 4600}
+  },
+  "hosts_states": ["ACTIVE", "PAUSED", "INACTIVE", "DISABLED"],
+  "operation_states": ["IDLE", "RUNNING", "DONE", "FAILED", "INTERRUPTED"],
+  "blocked_operations": ["tracker", "reboot", "file-edit", "backup-restore", "module-install", "arbitrary-shell"],
+  "host_command_interpolation": false,
+  "release_qualification": "not-qualified-until-hosted-android-and-physical-android16-gates"
+}

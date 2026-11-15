@@ -1,0 +1,16 @@
+{
+  "schema": "bh-app01/v3",
+  "api_version": 3,
+  "status": "Rules, Sources, TrackerGuard native transport; physical qualification pending",
+  "native_operations": ["config-read", "config-list", "config-write", "catalog", "tracker", "packages"],
+  "args": "one bounded ASCII pipe-delimited parameter, base64-wrapped before su -c",
+  "root_backends": ["hosts_config_safe.sh", "source_catalog.sh", "source_catalog_batch_ux09.sh", "bindhosts.sh tracker"],
+  "response": {"api":3,"action":"one of native_operations","encoded":"bounded base64 output"},
+  "writes_require_existing_webui_confirmation": true,
+  "arbitrary_shell_supported": false,
+  "root_path_overrides_allowed": false,
+  "oversized_result_policy": "refuse, never truncate silently",
+  "backups_and_https_mutation": "not supported in v3",
+  "ci_qualification": "requires exact SHA Companion, WebUI, TrackerGuard success",
+  "release_qualification": "not qualified until physical Android 16, rooted regression and signed artifact"
+}

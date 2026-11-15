@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """UX05 source contracts for history page, safe export, hooks, CI and version."""
 from pathlib import Path
+import re
 import unittest
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -62,7 +63,16 @@ class UX05Contract(unittest.TestCase):
                      '.github/workflows/release.yml'):
             self.assertIn('test_ux05_diagnostics.py',read(path))
             self.assertIn('test_ux05_contract.py',read(path))
-        self.assertIn('versionCode=21611',read('module/module.prop'))
+        # Latest installed module and its versionCode move together.
+        # update.json is the separately published release channel and may
+        # intentionally still point at the previous stable release.
+        prop=read('module/module.prop')
+        release=re.search(r'(?m)^version=v2\.1\.5-tg\.0\.(\d+)$',prop)
+        version_code=re.search(r'(?m)^versionCode=(\d+)$',prop)
+        self.assertIsNotNone(release)
+        self.assertIsNotNone(version_code)
+        self.assertGreaterEqual(int(release.group(1)),11)
+        self.assertEqual(int(version_code.group(1)),21600+int(release.group(1)))
         self.assertIn('v2.1.5-tg.0.11',read('update.json'))
         self.assertNotIn('monitor enable',read('module/ux05_diagnostics.sh'))
 
