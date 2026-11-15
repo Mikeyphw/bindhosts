@@ -57,6 +57,14 @@ def qualify(evidence, sha):
     apk = (evidence / 'apk-sha256.txt').read_text().strip()
     if not re.fullmatch('[0-9a-f]{64}', apk):
         raise ValueError('missing APK SHA256 evidence')
+    # PH02: the artifact must contain the *actual tested debug APK*, not just a
+    # checksum claiming that such an APK existed. This keeps phone acceptance
+    # pinned to exactly the bytes tested in the disposable API36 emulator.
+    hosted_apk = evidence / 'hosted-app-debug.apk'
+    if not hosted_apk.is_file() or hosted_apk.is_symlink() or not (100 <= hosted_apk.stat().st_size <= 30_000_000):
+        raise ValueError('tested hosted APK missing or unsafe')
+    if digest(hosted_apk) != apk:
+        raise ValueError('tested hosted APK SHA256 mismatch')
     # Android Gradle removes the target package after connected tests in some
     # configurations; verify that the exact built APK was reinstalled on the
     # disposable emulator before qualifying the independent QS cold start.

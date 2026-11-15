@@ -56,6 +56,14 @@ sha256sum "$apk" | awk '{print $1}' > "$out/apk-sha256.txt"
 # HF04 proved 3/3 UI tests and Lint passed, but cold-start am returned Error type 3.
 # Restore ONLY on a verified disposable emulator and verify the installed bytes.
 bash scripts/ci/bh_app01_p07_install_identity_hf05.sh "$apk" "$out"
+# PH02: retain the exact APK that passed these hosted instrumentation tests.
+# Do not substitute a separately compiled debug APK with another signing key.
+cp -- "$apk" "$out/hosted-app-debug.apk"
+chmod 0600 "$out/hosted-app-debug.apk"
+[[ $(sha256sum "$out/hosted-app-debug.apk" | awk '{print $1}') == $(cat "$out/apk-sha256.txt") ]] || {
+  echo 'BH_APP01_P07_PH02_REFUSED: exported hosted APK bytes differ from tested APK' >&2
+  exit 12
+}
 reportdir=android/companion/app/build/outputs/androidTest-results/connected
 [[ -d $reportdir ]] || { echo 'BH_APP01_P07_REFUSED: instrumentation XML directory missing' >&2; exit 12; }
 find "$reportdir" -type f -name '*.xml' -exec cp -- {} "$out"/ \;

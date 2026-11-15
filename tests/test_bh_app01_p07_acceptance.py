@@ -154,11 +154,14 @@ esac
         sha='a'*40
         (out/'source-commit.txt').write_text(sha+'\n')
         (out/'emulator-api.txt').write_text('35\n' if wrong_api else '36\n')
-        (out/'apk-sha256.txt').write_text('c'*64+'\n')
+        apk_bytes=b'hosted-tested-apk-debug' + bytes(range(256))
+        apk_hash=__import__('hashlib').sha256(apk_bytes).hexdigest()
+        (out/'hosted-app-debug.apk').write_bytes(apk_bytes)
+        (out/'apk-sha256.txt').write_text(apk_hash+'\n')
         (out/'emulator-installed-identity.txt').write_text(
             'schema=bh-app01/p07/hf05\nsource_sha='+sha+
             '\nemulator_api=36\nemulator_abi=x86_64\npackage=com.mikeyphw.bindhosts'+
-            '\napk_sha256='+'c'*64+'\ninstalled_sha256='+'c'*64+
+            '\napk_sha256='+apk_hash+'\ninstalled_sha256='+apk_hash+
             '\nphysical_device_writes=false\n')
         (out/'api36-home.png').write_bytes(b'\x89PNG\r\n\x1a\n'+b'x'*6000)
         (out/'api36-qs-confirmation.png').write_bytes(b'\x89PNG\r\n\x1a\n'+b'y'*6000)
@@ -189,7 +192,7 @@ esac
     def test_evidence_negatives_refuse_without_silent_degradation(self):
         variations=[dict(present=False), dict(wrong_api=True),dict(fail=True),
                     dict(skip=True),dict(missing='api36-home.png'),
-                    dict(missing='apk-sha256.txt'),dict(missing='source-commit.txt'),
+                    dict(missing='apk-sha256.txt'),dict(missing='hosted-app-debug.apk'),dict(missing='source-commit.txt'),
                     dict(missing='emulator-installed-identity.txt'),
                     dict(missing='qs-cold-start-receipt.txt'),
                     dict(missing='qs-cold-start-hierarchy.xml'),
@@ -206,12 +209,21 @@ esac
         with tempfile.TemporaryDirectory() as tmp:
             out=Path(tmp)/'evidence';sha=self.create(out)
             p=out/'emulator-installed-identity.txt'
-            for variant in (p.read_text().replace('installed_sha256='+'c'*64,
+            for variant in (p.read_text().replace('installed_sha256='+(out/'apk-sha256.txt').read_text().strip(),
                                                   'installed_sha256='+'d'*64),
                             p.read_text().replace('emulator_api=36','emulator_api=35'),
                             p.read_text().replace('physical_device_writes=false','physical_device_writes=true')):
                 p.write_text(variant)
                 with self.assertRaises(ValueError): sign.qualify(out,sha)
+
+    def test_ph02_tested_apk_bytes_must_match_hosted_digest(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out=Path(tmp)/'evidence';sha=self.create(out)
+            tested=out/'hosted-app-debug.apk'
+            tested.write_bytes(tested.read_bytes()+b'tampered')
+            with self.assertRaises(ValueError):sign.qualify(out,sha)
+            tested.unlink()
+            with self.assertRaises((FileNotFoundError,ValueError)):sign.qualify(out,sha)
 
     def test_hf02_ui_hierarchy_parsing_and_adversarial_refusals(self):
         import importlib.util
