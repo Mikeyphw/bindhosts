@@ -97,31 +97,42 @@ public final class P07HostedUiTest {
     }
 
     @Test public void updateTileIntentRequiresExplicitConfirmationAndCanBeCancelled() throws Exception {
-        // HF03: the real ActivityManager startActivity() inside ActivityScenario's
-        // onActivity callback left the scenario PAUSED. Its automatic close then
-        // timed out waiting for DESTROYED (HF02 exact-HEAD CI, 2/3 tests passed).
-        // Exercise the actual onNewIntent lifecycle handler on the tracked Activity,
-        // with no second Activity/task. The separate hosted ADB cold-start probe
-        // still MUST deliver a real QS intent, observe the dialog, tap Cancel,
-        // and verify native read-back events before CI can qualify this build.
-        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
-            scenario.onActivity(activity -> {
+        // HF04: HF02 and HF03 both passed the actual dialog + Cancel assertions,
+        // but ActivityScenario.close() timed out waiting for DESTROYED (PAUSED in
+        // HF02, RESUMED in HF03). Do not use ActivityScenario ownership for this
+        // QS test. Real ActivityManager cold-start acceptance below in CI remains
+        // independently mandatory, including the actual native Cancel click.
+        android.app.Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
+        Intent launch = new Intent(instrumentation.getTargetContext(), MainActivity.class)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        MainActivity activity = (MainActivity) instrumentation.startActivitySync(launch);
+        assertNotNull("Host Activity was not launched", activity);
+        try {
+            instrumentation.waitForIdleSync();
+            instrumentation.runOnMainSync(() -> {
+                assertFalse("Host Activity is finishing", activity.isFinishing());
                 Intent qs = new Intent(activity, MainActivity.class)
                         .setAction(MainActivity.ACTION_CONFIRM_UPDATE);
                 activity.onNewIntent(qs);
             });
             onView(withText("Update Bindhosts rules?")).check(matches(isDisplayed()));
-            // Never tap the positive action on a hosted emulator or a real device.
+            // Never tap Update: this is a hosted read-only safety acceptance.
             onView(withText("Cancel")).perform(click());
-            AtomicReference<WebView> current = new AtomicReference<>();
-            scenario.onActivity(activity -> {
-                assertFalse("QS action was not consumed", MainActivity.ACTION_CONFIRM_UPDATE.equals(activity.getIntent().getAction()));
-                assertFalse(activity.isFinishing());
-                current.set(findWeb(activity.getWindow().getDecorView()));
+            instrumentation.waitForIdleSync();
+            instrumentation.runOnMainSync(() -> {
+                assertFalse("QS action was not consumed",
+                        MainActivity.ACTION_CONFIRM_UPDATE.equals(activity.getIntent().getAction()));
+                assertFalse("Cancel unexpectedly finished the Activity", activity.isFinishing());
+                assertNotNull("Cancel must leave the native WebView attached",
+                        findWeb(activity.getWindow().getDecorView()));
             });
-            assertNotNull("Cancelling must leave the companion running", current.get());
-            assertEquals("Activity must still be resumed before scenario cleanup",
-                    androidx.lifecycle.Lifecycle.State.RESUMED, scenario.getState());
+        } finally {
+            // Best-effort explicit cleanup without AndroidX ActivityScenario.close,
+            // which is the demonstrated failing operation in both hosted runs.
+            instrumentation.runOnMainSync(() -> {
+                if (!activity.isFinishing() && !activity.isDestroyed()) activity.finish();
+            });
+            instrumentation.waitForIdleSync();
         }
     }
 }

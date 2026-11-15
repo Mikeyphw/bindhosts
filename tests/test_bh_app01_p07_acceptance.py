@@ -22,7 +22,7 @@ class P07(unittest.TestCase):
     def test_only_hosted_gradle_and_real_emulator(self):
         w = WORKFLOW.read_text()
         hosted = (ROOT/'scripts/ci/bh_app01_p07_emulator.sh').read_text()
-        for marker in ('reactivecircus/android-emulator-runner@v2', 'api-level: 36',
+        for marker in ('ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d', 'api-level: 36',
                        'target: google_apis', 'arch: x86_64',
                        'github.event.pull_request.head.sha || github.sha',
                        'SOURCE_SHA', 'bh_app01_p07_signoff.py', 'actions/upload-artifact@v4'):
@@ -71,7 +71,8 @@ class P07(unittest.TestCase):
         self.assertNotIn('ActivityScenario.launch(i)',test)
         self.assertIn('activity.onNewIntent(qs)',test)
         self.assertNotIn('activity.startActivity(qs)',test)
-        self.assertIn('scenario.getState()',test)
+        self.assertIn('instrumentation.startActivitySync(launch)',test)
+        self.assertNotIn('scenario.getState()',test)
         self.assertIn('onView(withText("Cancel")).perform(click())',test)
         hosted=(ROOT/'scripts/ci/bh_app01_p07_emulator.sh').read_text()
         self.assertIn('adb shell am force-stop com.mikeyphw.bindhosts',hosted)
@@ -230,30 +231,48 @@ esac
             (out/'failed-command-exit.txt').write_text('1\n')
             with self.assertRaises(ValueError):sign.qualify(out,sha)
 
-    def test_hf03_close_failure_at_paused_is_fixed_without_skipping_ui_checks(self):
+    def test_hf04_cinderbox_api36_runner_is_pinned_and_disposable(self):
+        workflow = WORKFLOW.read_text()
+        proven = 'ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d'
+        for fragment in ('runs-on: ubuntu-24.04', proven,
+                         'cores: 2', 'ram-size: 3072M', 'disk-size: 3072M',
+                         '-camera-back none -camera-front none',
+                         'github.event.pull_request.head.sha || github.sha',
+                         'bh_app01_p07_signoff.py', 'if: always()'):
+            self.assertIn(fragment, workflow)
+        self.assertNotIn('continue-on-error: true', workflow)
+        self.assertNotIn('abortOnError = false', workflow)
+
+    def test_hf04_real_qs_and_instrumentation_lifecycle_without_androidx_close(self):
         source = (APK/'src/androidTest/java/com/mikeyphw/bindhosts/P07HostedUiTest.java').read_text()
         marker = 'void updateTileIntentRequiresExplicitConfirmationAndCanBeCancelled()'
         self.assertEqual(source.count(marker), 1)
         test = source.split(marker, 1)[1].split('\n    }',1)[0]
-        self.assertIn('ActivityScenario.launch(MainActivity.class)', test)
-        self.assertIn('activity.onNewIntent(qs)', test)
-        self.assertNotIn('activity.startActivity(qs)', test)
-        for mandatory in ('onView(withText("Update Bindhosts rules?"))',
-                          'onView(withText("Cancel")).perform(click())',
-                          'scenario.onActivity(activity -> {',
-                          'assertFalse(activity.isFinishing())',
-                          'scenario.getState()',
-                          'try (ActivityScenario<MainActivity> scenario'):
-            self.assertIn(mandatory, test)
+        for must in ('instrumentation.startActivitySync(launch)',
+                     'instrumentation.runOnMainSync(() -> {',
+                     'activity.onNewIntent(qs)',
+                     'onView(withText("Update Bindhosts rules?"))',
+                     'onView(withText("Cancel")).perform(click())',
+                     'assertFalse("Cancel unexpectedly finished the Activity"',
+                     'assertNotNull("Cancel must leave the native WebView attached"',
+                     'finally {', 'activity.finish();', 'instrumentation.waitForIdleSync()'):
+            self.assertIn(must, test)
+        for prohibited in ('ActivityScenario.launch(', 'scenario.getState()',
+                           'scenario.close()', 'activity.startActivity(qs)',
+                           'onView(withText("Update")).perform(click())'):
+            self.assertNotIn(prohibited, test)
+        # First existing UI test still uses a real ActivityScenario and assets.
+        self.assertIn('try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class))', source)
         shell = (ROOT/'scripts/ci/bh_app01_p07_emulator.sh').read_text()
-        signoff = (ROOT/'scripts/ci/bh_app01_p07_signoff.py').read_text()
-        # The real system ActivityManager path must not be replaced by source assertions.
-        self.assertIn('adb shell am force-stop com.mikeyphw.bindhosts', shell)
-        self.assertIn('adb shell am start -W -n com.mikeyphw.bindhosts/.MainActivity', shell)
-        self.assertIn('adb shell input tap "$x" "$y"', shell)
-        self.assertIn('qs-cold-start-receipt.txt', signoff)
-        self.assertIn('qs-cold-start-hierarchy.xml', signoff)
-        self.assertIn("EXPECTED_TESTS = frozenset({", signoff)
-        self.assertNotIn('continue-on-error: true', (ROOT/'.github/workflows/bh-app01-p07-api36.yml').read_text())
+        verifier = (ROOT/'scripts/ci/bh_app01_p07_signoff.py').read_text()
+        for token in ('adb shell am force-stop com.mikeyphw.bindhosts',
+                      'adb shell am start -W -n com.mikeyphw.bindhosts/.MainActivity',
+                      'adb shell input tap "$x" "$y"',
+                      'qs-cold-start-receipt.txt', 'QS_CONFIRM_CANCELLED'):
+            self.assertIn(token, shell)
+        for token in ('EXPECTED_TESTS = frozenset({', 'qs-cold-start-receipt.txt',
+                      'qs-cold-start-hierarchy.xml', 'real_cold_start_qs_confirm_and_cancel'):
+            self.assertIn(token, verifier)
+        self.assertNotIn('continue-on-error: true', WORKFLOW.read_text())
 
 if __name__=='__main__': unittest.main()

@@ -21,7 +21,7 @@ concurrency:
 jobs:
   api36-ui:
     name: Disposable API36 UI, root-denial and QS confirmation
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 55
     env:
       SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -63,14 +63,17 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
       - name: Real API36 emulator UI tests (disposable, never physical-device writes)
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
         with:
           api-level: 36
           target: google_apis
           arch: x86_64
           profile: pixel_6
+          cores: 2
+          ram-size: 3072M
+          disk-size: 3072M
           disable-animations: true
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
           script: bash scripts/ci/bh_app01_p07_emulator.sh
       - name: Fail-closed source-pinned hosted receipt
         shell: bash
