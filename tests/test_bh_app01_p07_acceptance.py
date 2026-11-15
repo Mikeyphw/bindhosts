@@ -69,8 +69,9 @@ class P07(unittest.TestCase):
         self.assertNotIn('intent.setAction(null); // Avoid repeating a prior confirmation after recreation.\n            showConfirmUpdate();',activity)
         self.assertIn('ActivityScenario.launch(MainActivity.class)',test)
         self.assertNotIn('ActivityScenario.launch(i)',test)
-        self.assertIn('Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP',test)
-        self.assertIn('activity.startActivity(qs)',test)
+        self.assertIn('activity.onNewIntent(qs)',test)
+        self.assertNotIn('activity.startActivity(qs)',test)
+        self.assertIn('scenario.getState()',test)
         self.assertIn('onView(withText("Cancel")).perform(click())',test)
         hosted=(ROOT/'scripts/ci/bh_app01_p07_emulator.sh').read_text()
         self.assertIn('adb shell am force-stop com.mikeyphw.bindhosts',hosted)
@@ -228,5 +229,31 @@ esac
             (out/'qs-cold-start-logcat.txt').write_text('QS_CONFIRM_INTENT_ACCEPTED\nQS_CONFIRM_DIALOG_VISIBLE\nQS_CONFIRM_CANCELLED\n')
             (out/'failed-command-exit.txt').write_text('1\n')
             with self.assertRaises(ValueError):sign.qualify(out,sha)
+
+    def test_hf03_close_failure_at_paused_is_fixed_without_skipping_ui_checks(self):
+        source = (APK/'src/androidTest/java/com/mikeyphw/bindhosts/P07HostedUiTest.java').read_text()
+        marker = 'void updateTileIntentRequiresExplicitConfirmationAndCanBeCancelled()'
+        self.assertEqual(source.count(marker), 1)
+        test = source.split(marker, 1)[1].split('\n    }',1)[0]
+        self.assertIn('ActivityScenario.launch(MainActivity.class)', test)
+        self.assertIn('activity.onNewIntent(qs)', test)
+        self.assertNotIn('activity.startActivity(qs)', test)
+        for mandatory in ('onView(withText("Update Bindhosts rules?"))',
+                          'onView(withText("Cancel")).perform(click())',
+                          'scenario.onActivity(activity -> {',
+                          'assertFalse(activity.isFinishing())',
+                          'scenario.getState()',
+                          'try (ActivityScenario<MainActivity> scenario'):
+            self.assertIn(mandatory, test)
+        shell = (ROOT/'scripts/ci/bh_app01_p07_emulator.sh').read_text()
+        signoff = (ROOT/'scripts/ci/bh_app01_p07_signoff.py').read_text()
+        # The real system ActivityManager path must not be replaced by source assertions.
+        self.assertIn('adb shell am force-stop com.mikeyphw.bindhosts', shell)
+        self.assertIn('adb shell am start -W -n com.mikeyphw.bindhosts/.MainActivity', shell)
+        self.assertIn('adb shell input tap "$x" "$y"', shell)
+        self.assertIn('qs-cold-start-receipt.txt', signoff)
+        self.assertIn('qs-cold-start-hierarchy.xml', signoff)
+        self.assertIn("EXPECTED_TESTS = frozenset({", signoff)
+        self.assertNotIn('continue-on-error: true', (ROOT/'.github/workflows/bh-app01-p07-api36.yml').read_text())
 
 if __name__=='__main__': unittest.main()

@@ -97,17 +97,18 @@ public final class P07HostedUiTest {
     }
 
     @Test public void updateTileIntentRequiresExplicitConfirmationAndCanBeCancelled() throws Exception {
-        // AndroidX ActivityScenario.launch(Intent with QS action) did not dispatch
-        // on API36 (PRE_ON_CREATE, launcher screenshot, no application crash).
-        // Qualify cold-start with an independent real ADB am-start/UI-tree check
-        // in bh_app01_p07_emulator.sh. Here use the fully resumed actual Activity
-        // and a real ActivityManager onNewIntent delivery to test QS+Cancel.
+        // HF03: the real ActivityManager startActivity() inside ActivityScenario's
+        // onActivity callback left the scenario PAUSED. Its automatic close then
+        // timed out waiting for DESTROYED (HF02 exact-HEAD CI, 2/3 tests passed).
+        // Exercise the actual onNewIntent lifecycle handler on the tracked Activity,
+        // with no second Activity/task. The separate hosted ADB cold-start probe
+        // still MUST deliver a real QS intent, observe the dialog, tap Cancel,
+        // and verify native read-back events before CI can qualify this build.
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
             scenario.onActivity(activity -> {
                 Intent qs = new Intent(activity, MainActivity.class)
-                        .setAction(MainActivity.ACTION_CONFIRM_UPDATE)
-                        .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-                activity.startActivity(qs);
+                        .setAction(MainActivity.ACTION_CONFIRM_UPDATE);
+                activity.onNewIntent(qs);
             });
             onView(withText("Update Bindhosts rules?")).check(matches(isDisplayed()));
             // Never tap the positive action on a hosted emulator or a real device.
@@ -119,6 +120,8 @@ public final class P07HostedUiTest {
                 current.set(findWeb(activity.getWindow().getDecorView()));
             });
             assertNotNull("Cancelling must leave the companion running", current.get());
+            assertEquals("Activity must still be resumed before scenario cleanup",
+                    androidx.lifecycle.Lifecycle.State.RESUMED, scenario.getState());
         }
     }
 }
