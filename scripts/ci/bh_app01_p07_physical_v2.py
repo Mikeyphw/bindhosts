@@ -81,8 +81,12 @@ def inspect(serial, source_sha, hosted_receipt=None):
         refuse('DEVICE_NOT_ONLINE')
     all_devices = adb(serial, ['devices', '-l']).splitlines()
     connected = [line.split()[0] for line in all_devices if len(line.split()) >= 2 and line.split()[1] == 'device']
-    if connected != [serial]:
-        refuse('EXPECTED_EXACTLY_ONE_REQUESTED_DEVICE')
+    # Other ADB devices can coexist (for example, emulator-5554 on Termux).
+    # Every request is already explicitly bound with ``adb -s <serial>``;
+    # require exactly one *online* inventory entry for that specific target.
+    # Missing, offline, or duplicate entries must still refuse.
+    if connected.count(serial) != 1:
+        refuse('EXPECTED_EXACTLY_ONE_ONLINE_TARGET_DEVICE')
     api = adb(serial, ['shell', 'getprop', 'ro.build.version.sdk'])
     abi = adb(serial, ['shell', 'getprop', 'ro.product.cpu.abi'])
     emu = adb(serial, ['shell', 'getprop', 'ro.kernel.qemu'])
