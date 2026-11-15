@@ -52,6 +52,10 @@ gradle -p android/companion --no-daemon \
 apk=android/companion/app/build/outputs/apk/debug/app-debug.apk
 [[ -s $apk ]] || { echo 'BH_APP01_P07_REFUSED: APK absent' >&2; exit 12; }
 sha256sum "$apk" | awk '{print $1}' > "$out/apk-sha256.txt"
+# connectedDebugAndroidTest may uninstall the target APK at teardown.
+# HF04 proved 3/3 UI tests and Lint passed, but cold-start am returned Error type 3.
+# Restore ONLY on a verified disposable emulator and verify the installed bytes.
+bash scripts/ci/bh_app01_p07_install_identity_hf05.sh "$apk" "$out"
 reportdir=android/companion/app/build/outputs/androidTest-results/connected
 [[ -d $reportdir ]] || { echo 'BH_APP01_P07_REFUSED: instrumentation XML directory missing' >&2; exit 12; }
 find "$reportdir" -type f -name '*.xml' -exec cp -- {} "$out"/ \;

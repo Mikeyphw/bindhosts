@@ -57,6 +57,18 @@ def qualify(evidence, sha):
     apk = (evidence / 'apk-sha256.txt').read_text().strip()
     if not re.fullmatch('[0-9a-f]{64}', apk):
         raise ValueError('missing APK SHA256 evidence')
+    # Android Gradle removes the target package after connected tests in some
+    # configurations; verify that the exact built APK was reinstalled on the
+    # disposable emulator before qualifying the independent QS cold start.
+    expected_identity = ('schema=bh-app01/p07/hf05\nsource_sha=' + sha +
+                         '\nemulator_api=36\nemulator_abi=x86_64' +
+                         '\npackage=com.mikeyphw.bindhosts' +
+                         '\napk_sha256=' + apk +
+                         '\ninstalled_sha256=' + apk +
+                         '\nphysical_device_writes=false\n')
+    identity = (evidence / 'emulator-installed-identity.txt').read_text()
+    if identity != expected_identity:
+        raise ValueError('hosted installed APK byte identity missing or mismatched')
     xmls = list(evidence.glob('TEST-*.xml'))
     if not xmls:
         raise ValueError('no instrumentation XML')

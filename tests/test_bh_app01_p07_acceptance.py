@@ -155,6 +155,11 @@ esac
         (out/'source-commit.txt').write_text(sha+'\n')
         (out/'emulator-api.txt').write_text('35\n' if wrong_api else '36\n')
         (out/'apk-sha256.txt').write_text('c'*64+'\n')
+        (out/'emulator-installed-identity.txt').write_text(
+            'schema=bh-app01/p07/hf05\nsource_sha='+sha+
+            '\nemulator_api=36\nemulator_abi=x86_64\npackage=com.mikeyphw.bindhosts'+
+            '\napk_sha256='+'c'*64+'\ninstalled_sha256='+'c'*64+
+            '\nphysical_device_writes=false\n')
         (out/'api36-home.png').write_bytes(b'\x89PNG\r\n\x1a\n'+b'x'*6000)
         (out/'api36-qs-confirmation.png').write_bytes(b'\x89PNG\r\n\x1a\n'+b'y'*6000)
         (out/'qs-cold-start-am.txt').write_text('Status: ok\n')
@@ -185,6 +190,7 @@ esac
         variations=[dict(present=False), dict(wrong_api=True),dict(fail=True),
                     dict(skip=True),dict(missing='api36-home.png'),
                     dict(missing='apk-sha256.txt'),dict(missing='source-commit.txt'),
+                    dict(missing='emulator-installed-identity.txt'),
                     dict(missing='qs-cold-start-receipt.txt'),
                     dict(missing='qs-cold-start-hierarchy.xml'),
                     dict(missing='api36-qs-confirmation.png'),
@@ -197,6 +203,15 @@ esac
         with tempfile.TemporaryDirectory() as tmp:
             out=Path(tmp)/'evidence';self.create(out)
             with self.assertRaises(ValueError):sign.qualify(out,'b'*40)
+        with tempfile.TemporaryDirectory() as tmp:
+            out=Path(tmp)/'evidence';sha=self.create(out)
+            p=out/'emulator-installed-identity.txt'
+            for variant in (p.read_text().replace('installed_sha256='+'c'*64,
+                                                  'installed_sha256='+'d'*64),
+                            p.read_text().replace('emulator_api=36','emulator_api=35'),
+                            p.read_text().replace('physical_device_writes=false','physical_device_writes=true')):
+                p.write_text(variant)
+                with self.assertRaises(ValueError): sign.qualify(out,sha)
 
     def test_hf02_ui_hierarchy_parsing_and_adversarial_refusals(self):
         import importlib.util
@@ -274,5 +289,97 @@ esac
                       'qs-cold-start-hierarchy.xml', 'real_cold_start_qs_confirm_and_cancel'):
             self.assertIn(token, verifier)
         self.assertNotIn('continue-on-error: true', WORKFLOW.read_text())
+
+    def test_hf05_reinstall_happens_after_android_instrumentation_before_cold_start(self):
+        sh=(ROOT/'scripts/ci/bh_app01_p07_emulator.sh').read_text()
+        helper=(ROOT/'scripts/ci/bh_app01_p07_install_identity_hf05.sh').read_text()
+        verifier=(ROOT/'scripts/ci/bh_app01_p07_signoff.py').read_text()
+        build=sh.index(':app:connectedDebugAndroidTest')
+        reinstall=sh.index('bash scripts/ci/bh_app01_p07_install_identity_hf05.sh')
+        cold=sh.index('adb shell am force-stop com.mikeyphw.bindhosts')
+        self.assertLess(build,reinstall)
+        self.assertLess(reinstall,cold)
+        for fragment in ('GITHUB_ACTIONS', 'SOURCE_SHA', 'git rev-parse HEAD',
+                         'emulator-5554', 'ro.kernel.qemu', 'ro.build.version.sdk',
+                         'ro.product.cpu.abi', 'install -r -t',
+                         'pm path com.mikeyphw.bindhosts', 'shell sha256sum',
+                         'INSTALLED_BYTES_MISMATCH', 'emulator-installed-identity.txt'):
+            self.assertIn(fragment,helper)
+        for fragment in ('emulator-installed-identity.txt', 'installed_sha256=',
+                         'physical_device_writes=false', 'hosted installed APK byte identity'):
+            self.assertIn(fragment,verifier)
+        self.assertIn('adb shell input tap "$x" "$y"',sh)
+        self.assertNotIn('continue-on-error: true', WORKFLOW.read_text())
+
+    def test_hf05_real_bash_emulator_reinstall_fixture_and_adversarial_refusals(self):
+        # All adbs here are synthetic executables in a temp dir; no real Android
+        # connection or installation is made from these Python tests.
+        import hashlib
+        helper=ROOT/'scripts/ci/bh_app01_p07_install_identity_hf05.sh'
+        sha='a'*40
+        with tempfile.TemporaryDirectory() as tmp:
+            work=Path(tmp);bin=work/'bin';bin.mkdir()
+            apk=work/'android/companion/app/build/outputs/apk/debug/app-debug.apk'
+            apk.parent.mkdir(parents=True)
+            apk.write_bytes(b'DISPOSABLE_APK_HF05_'+bytes(range(64)))
+            apk_hash=hashlib.sha256(apk.read_bytes()).hexdigest()
+            ev=work/'android/companion/p07-evidence';ev.mkdir(parents=True)
+            (ev/'apk-sha256.txt').write_text(apk_hash+'\n')
+            script='''#!/bin/sh
+set -eu
+printf '%s\\n' "$*" >> "$ADB_CALLS"
+case "${HF05_SCENARIO:-good}" in physical) qemu=0;; *) qemu=1;; esac
+if [ "$1" = devices ]; then
+  printf 'List of devices attached\\nemulator-5554 device product:generic\\n'; exit 0
+fi
+[ "$1" = -s ] && [ "$2" = emulator-5554 ] || exit 41
+shift 2
+case "$1" in
+ get-state) echo device ;;
+ install) [ "${HF05_SCENARIO:-good}" != install_fail ] || exit 42
+          echo Success ;;
+ shell) shift
+  case "$1" in
+   getprop) case "$2" in
+    ro.kernel.qemu) echo "$qemu";;
+    ro.build.version.sdk) echo 36;;
+    ro.product.cpu.abi) echo x86_64;;
+    *) exit 43;; esac ;;
+   pm) [ "${HF05_SCENARIO:-good}" != no_package ] || exit 44
+       echo 'package:/data/app/~~fixture/com.mikeyphw.bindhosts-fake/base.apk' ;;
+   sha256sum) if [ "${HF05_SCENARIO:-good}" = mismatch ]; then
+                 printf '%064d  %s\\n' 0 "$2"
+               else printf '%s  %s\\n' "$APK_HASH" "$2"; fi ;;
+   *) exit 45;; esac ;;
+ *) exit 46;;
+esac
+'''
+            (bin/'adb').write_text(script);(bin/'adb').chmod(0o755)
+            (bin/'git').write_text('#!/bin/sh\n[ "$1" = rev-parse ] || exit 47\n[ "$2" = HEAD ] || exit 48\nprintf "%s\\n" "'+sha+'"\n')
+            (bin/'git').chmod(0o755)
+            env={**os.environ,'GITHUB_ACTIONS':'true','RUNNER_OS':'Linux',
+                 'SOURCE_SHA':sha,'APK_HASH':apk_hash,'ADB_CALLS':str(work/'calls'),
+                 'PATH':str(bin)+os.pathsep+os.environ['PATH']}
+            args=['bash',str(helper),'android/companion/app/build/outputs/apk/debug/app-debug.apk',
+                  'android/companion/p07-evidence']
+            ok=subprocess.run(args,cwd=work,env=env,text=True,capture_output=True,timeout=10)
+            self.assertEqual(ok.returncode,0,ok.stderr)
+            identity=(ev/'emulator-installed-identity.txt').read_text()
+            self.assertIn('installed_sha256='+apk_hash,identity)
+            self.assertIn('source_sha='+sha,identity)
+            self.assertIn('install -r -t', (work/'calls').read_text())
+            for bad in ('physical','mismatch','no_package','install_fail'):
+                (ev/'emulator-installed-identity.txt').unlink(missing_ok=True)
+                log=work/'calls';log.write_text('')
+                done=subprocess.run(args,cwd=work,env={**env,'HF05_SCENARIO':bad},
+                                    text=True,capture_output=True,timeout=10)
+                self.assertEqual(done.returncode,12,(bad,done.stderr))
+                self.assertFalse((ev/'emulator-installed-identity.txt').exists())
+                if bad=='physical':self.assertNotIn('install -r -t',log.read_text())
+            log=work/'calls';log.write_text('')
+            denied=subprocess.run(args,cwd=work,env={**env,'SOURCE_SHA':'b'*40},
+                                  text=True,capture_output=True,timeout=10)
+            self.assertEqual(denied.returncode,12)
+            self.assertNotIn('install -r -t',log.read_text())
 
 if __name__=='__main__': unittest.main()
